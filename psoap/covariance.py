@@ -1,0 +1,492 @@
+import numpy as np
+from scipy.linalg import cho_factor, cho_solve
+from scipy.optimize import minimize
+
+import psoap
+from psoap import constants as C
+from psoap import matrix_functions
+from psoap.data import redshift
+
+# Covariance Kernel Functions
+# To be later fed into np.from_function routines
+# These functions have been superseeded by those in matrix_functions.pyx, however they are left
+# here to serve as checks in the tests module.
+def sqexp_func(x0i, x1i, x0v=None, x1v=None, amp2=None, l2=None):
+    '''amp is the amplitude
+    lv is the scale length in km/s.
+
+    This funny signature with x0i, x1i, x0v, etc... is so that this function can be later used
+    in the np.from_function routine to create a matrix.'''
+
+    x0 = x0v[x0i]
+    x1 = x1v[x1i]
+
+    # Calculate the distance in km/s
+    r = 0.5 * C.c_kms * (x0v[x0i] - x1v[x1i])/(x0v[x0i] + x1v[x1i]) # Km/s
+    # r = C.c_kms/x0v[x0i] * (x0v[x0i] - x1v[x1i]) # Km/s
+
+    return amp2 * np.exp(-0.5 * r**2 / l2)
+
+
+def sqexp_func_three(x0i, x1i, f0v=None, f1v=None, g0v=None, g1v=None, h0v=None, h1v=None, amp2f=None, l2f=None, amp2g=None, l2g=None, amp2h=None, l2h=None):
+    '''
+    f0v is the vector of (shifted) wavelengths for the f spectrum
+    f1v is the othre vector
+
+    g0v is the vector for g spectrum,
+
+    h0v, etc.
+    '''
+
+    # Calculate the distance in km/s
+    rf = C.c_kms/f0v[x0i] * (f0v[x0i] - f1v[x1i]) # Km/s
+    rg = C.c_kms/g0v[x0i] * (g0v[x0i] - g1v[x1i]) # Km/s
+    rh = C.c_kms/h0v[x0i] * (h0v[x0i] - h1v[x1i]) # Km/s
+
+    return amp2f * np.exp(-0.5 * rf**2/l2f) + amp2g * np.exp(-0.5 * rg**2/l2g) + amp2h * np.exp(-0.5 * rh**2/l2h)
+
+# These functions deliver a filled covariance matrix (part of V11, V12, V22, etc) from the squared exponential kernels
+def get_C(wl0, wl1, amp, l):
+    '''Returns a covariance matrix that is (len(wl0), len(wl1))'''
+
+    mat = np.fromfunction(sqexp_func, (len(wl0),len(wl1)), x0v=wl0, x1v=wl1, amp2=amp**2, l2=l**2, dtype=np.int)
+
+    return mat
+
+def get_C_three(wlA0, wlA1, wlB0, wlB1, wlC0, wlC1, amp_f, l_f, amp_g, l_g, amp_h, l_h):
+    '''
+    Returns a covariance matrix as the sum of three Gaussian processes.
+    '''
+
+    mat = np.fromfunction(sqexp_func_three, (len(wlA0), len(wlA1)), f0v=wlA0, f1v=wlA1, g0v=wlB0, g1v=wlB1, h0v=wlC0, h1v=wlC1, amp2f=amp_f**2, l2f=l_f**2, amp2g=amp_g**2, l2g=l_g**2, amp2h=amp_h**2, l2h=l_h**2, dtype=np.int)
+
+    return mat
+
+# These kernel functions are only useful for visualizing the time dependence
+def rt_func(x0i, x1i, d0v=None, d1v=None, tau=None):
+    d0 = d0v[x0i]
+    d1 = d1v[x1i]
+
+    rt = np.abs(d1 - d0) #days
+    return rt
+
+# These kernel functions are only useful for visualizing the time dependence
+def rt_exp_func(x0i, x1i, d0v=None, d1v=None, tau=None):
+    d0 = d0v[x0i]
+    d1 = d1v[x1i]
+
+    rt = np.abs(d1 - d0) #days
+
+    return np.exp(-0.5 * (rt**2/tau**2))
+
+# These functions return a filled covariance matrix for the date distance kernels
+def get_C_rt(d0, d1, tau):
+    mat = np.fromfunction(rt_func, (len(d0), len(d1)), d0v=d0, d1v=d1, tau=tau, dtype=np.int)
+    return mat
+
+def get_C_exp_rt(d0, d1, tau):
+    mat = np.fromfunction(rt_exp_func, (len(d0), len(d1)), d0v=d0, d1v=d1, tau=tau, dtype=np.int)
+    return mat
+
+
+def get_V11(wl_known, sigma_known, amp_f, l_f):
+    '''
+    wl_known is a 1D array.
+    sigma_known is a 1D array.
+    amp and lv are scalar values.
+    '''
+
+    V11 = get_C(wl_known, wl_known, amp_f, l_f) + sigma_known**2 * np.eye(len(wl_known))
+
+    return V11
+
+def get_V11_three(wl_known_A, wl_known_B, wl_known_C, sigma_known, amp_f, l_f, amp_g, l_g, amp_h, l_h):
+
+    V11 = get_C_three(wl_known_A, wl_known_A, wl_known_B, wl_known_B, wl_known_C, wl_known_C, amp_f=amp_f, l_f=l_f, amp_g=amp_g, l_g=l_g, amp_h=amp_h, l_h=l_h)
+
+    V11[np.diag_indices_from(V11)] += sigma_known**2
+
+    return V11
+
+def get_V12(wl_known, wl_predict, amp_f, l_f):
+
+    V12 = get_C(wl_known, wl_predict, amp_f, l_f)
+
+    return V12
+
+def get_V22(wl_predict, amp_f, l_f):
+
+    # Might need a small offset for numerical stability
+    V22 = get_C(wl_predict, wl_predict, amp_f, l_f) + 1e-5 * np.eye(len(wl_predict)) # Add a small nugget
+
+    return V22
+
+
+def predict_one(wl_known, fl_known, sigma_known, wl_predict, amp_f, l_f, mu_GP=1.0):
+
+    '''wl_known are known wavelengths.
+    wl_predict are the prediction wavelengths.
+    Assumes all inputs are 1D arrays.'''
+
+    # determine V11, V12, V21, and V22
+    M = len(wl_known)
+    V11 = np.empty((M, M), dtype=np.float64)
+    matrix_functions.fill_V11_one(V11, wl_known, amp_f, l_f)
+    # V11[np.diag_indices_from(V11)] += sigma_known**2
+    V11 = V11 + sigma_known**2 * np.eye(M)
+
+    N = len(wl_predict)
+    V12 = np.empty((M, N), dtype=np.float64)
+    matrix_functions.fill_V12_one(V12, wl_known, wl_predict, amp_f, l_f)
+
+    V22 = np.empty((N, N), dtype=np.float64)
+    # V22 is the covariance between the prediction wavelengths
+    # The routine to fill V11 is the same as V22
+    matrix_functions.fill_V11_one(V22, wl_predict, amp_f, l_f)
+
+    # Find V11^{-1}
+    factor, flag = cho_factor(V11)
+
+    mu = mu_GP + np.dot(V12.T, cho_solve((factor, flag), (fl_known - mu_GP)))
+
+    Sigma = V22 - np.dot(V12.T, cho_solve((factor, flag), V12))
+
+    return (mu, Sigma)
+
+
+def predict_python(wl_known, fl_known, sigma_known, wl_predict, amp_f, l_f, mu_GP=1.0):
+
+    '''wl_known are known wavelengths.
+    wl_predict are the prediction wavelengths.'''
+
+    # determine V11, V12, V21, and V22
+    V11 = get_V11(wl_known, sigma_known, amp_f, l_f)
+
+    # V12 is covariance between data wavelengths and prediction wavelengths
+    V12 = get_V12(wl_known, wl_predict, amp_f, l_f)
+
+    # V22 is the covariance between the prediction wavelengths
+    V22 = get_V22(wl_predict, amp_f, l_f)
+
+    # Find V11^{-1}
+    factor, flag = cho_factor(V11)
+
+    mu = mu_GP + np.dot(V12.T, cho_solve((factor, flag), (fl_known - mu_GP)))
+
+    Sigma = V22 - np.dot(V12.T, cho_solve((factor, flag), V12))
+
+    return (mu, Sigma)
+
+
+def predict_f_g(wl_f, wl_g, wl_fg, fl_fg, sigma_fg, mu_f, amp_f, l_f, mu_g, amp_g, l_g):
+    '''
+    Given that f + g is the flux that we're modeling, jointly predict the components.
+    '''
+    # Assert that wl_f and wl_g are the same length
+    assert len(wl_f) == len(wl_g), "Input wavelengths must be the same lengeth."
+    n_pix = len(wl_f)
+
+    # Convert mu constants into vectors
+    mu_f = mu_f * np.ones(n_pix)
+    mu_g = mu_g * np.ones(n_pix)
+
+    # Cat these into a single vector
+    mu_cat = np.hstack((mu_f, mu_g))
+
+    # for these blocks, set sigma nuggets to 0.0. Add in later.
+    V11_f = get_V11(wl_f.flatten(), 0.0, amp_f, l_f)
+    V11_g = get_V11(wl_g.flatten(), 0.0, amp_g, l_g)
+    V11_fg = V11_f + V11_g + sigma_fg**2 * np.eye(len(V11_f))
+    B = V11_fg
+
+    zeros = np.zeros((n_pix, n_pix))
+    A = np.vstack((np.hstack([V11_f, zeros]), np.hstack([zeros, V11_g])))
+    A = A + 1e-5 * np.eye(len(A)) # Add a small nugget term
+    C = np.vstack((V11_f, V11_g))
+
+    factor, flag = cho_factor(B)
+
+    mu = mu_cat + np.dot(C, cho_solve((factor, flag), fl_fg - 1.0))
+    Sigma = A - np.dot(C, cho_solve((factor, flag), C.T))
+
+    return mu, Sigma
+
+def predict_f_g_sum(wl_f, wl_g, fl_fg, sigma_fg, wl_f_predict, wl_g_predict, mu_fg, amp_f, l_f, amp_g, l_g):
+
+    # Assert that wl_f and wl_g are the same length
+    assert len(wl_f) == len(wl_g), "Input wavelengths must be the same length."
+
+    V11_f = get_V11(wl_f_predict, 0.0, amp_f, l_f)
+    V11_g = get_V11(wl_g_predict, 0.0, amp_g, l_g)
+    V11 = V11_f + V11_g + 1e-5 * np.eye(len(V11_f))
+
+    V12_f = get_V12(wl_f_predict, wl_f, amp_f, l_f)
+    V12_g = get_V12(wl_g_predict, wl_g, amp_g, l_g)
+    V12 = V12_f + V12_g
+
+    V22_f = get_V22(wl_f, amp_f, l_f)
+    V22_g = get_V22(wl_g, amp_g, l_g)
+    V22 = V22_f + V22_g + sigma_fg**2 * np.eye(len(V22_f))
+
+    factor, flag = cho_factor(V22)
+
+    mu = mu_fg + np.dot(V12.T, cho_solve((factor, flag), (fl_fg - 1.0)))
+    Sigma = V11 - np.dot(V12, cho_solve((factor, flag), V12.T))
+
+    return mu, Sigma
+
+
+def predict_f_g_h(wl_f, wl_g, wl_h, wl_fgh, fl_fgh, sigma_fgh, mu_g, mu_h, amp_f, l_f, amp_g, l_g, amp_h, l_h, mu_f=0.5):
+    '''
+    Given that f + g + h is the flux that we're modeling, jointly predict the components.
+    '''
+    # Assert that wl_f and wl_g are the same length
+    assert len(wl_f) == len(wl_g), "Input wavelengths must be the same length."
+    assert len(wl_f) == len(wl_h), "Input wavelengths must be the same length."
+    n_pix = len(wl_f)
+
+    # Convert mu constants into vectors
+    mu_f = mu_f * np.ones(n_pix)
+    mu_g = mu_g * np.ones(n_pix)
+    mu_h = mu_h * np.ones(n_pix)
+
+    # Cat these into a single vector
+    mu_cat = np.hstack((mu_f, mu_g, mu_h))
+
+    # for these blocks, set sigma nuggets to 0.0. Add in later.
+    V11_f = get_V11(wl_f.flatten(), 0.0, amp_f, l_f)
+    V11_g = get_V11(wl_g.flatten(), 0.0, amp_g, l_g)
+    V11_h = get_V11(wl_h.flatten(), 0.0, amp_h, l_h)
+    V11_fgh = V11_f + V11_g + V11_h + sigma_fgh**2 * np.eye(len(V11_f))
+    B = V11_fgh
+
+
+    zeros = np.zeros((n_pix, n_pix))
+    A = np.vstack((np.hstack([V11_f, zeros, zeros]), np.hstack([zeros, V11_g, zeros]), np.hstack([zeros, zeros, V11_h])))
+    A = A + 1e-5 * np.eye(len(A)) # Add a small nugget term
+    C = np.vstack((V11_f, V11_g, V11_h))
+
+    factor, flag = cho_factor(B)
+
+    mu = mu_cat + np.dot(C, cho_solve((factor, flag), fl_fgh - 1.0))
+    Sigma = A - np.dot(C, cho_solve((factor, flag), C.T))
+
+    return mu, Sigma
+
+def predict_f_g_h_sum(wl_f, wl_g, wl_h, fl_fgh, sigma_fgh, wl_f_predict, wl_g_predict, wl_h_predict, mu_fgh, amp_f, l_f, amp_g, l_g, amp_h, l_h):
+    '''
+    Given that f + g + h is the flux that we're modeling, predict the joint sum.
+    '''
+    # Assert that wl_f and wl_g are the same length
+    assert len(wl_f) == len(wl_g), "Input wavelengths must be the same length."
+    assert len(wl_f) == len(wl_h), "Input wavelengths must be the same length."
+    n_pix = len(wl_f)
+
+    V11_f = get_V11(wl_f_predict, 0.0, amp_f, l_f)
+    V11_g = get_V11(wl_g_predict, 0.0, amp_g, l_g)
+    V11_h = get_V11(wl_h_predict, 0.0, amp_h, l_h)
+    V11 = V11_f + V11_g + V11_h + 1e-5 * np.eye(len(V11_f))
+
+    V12_f = get_V12(wl_f_predict, wl_f, amp_f, l_f)
+    V12_g = get_V12(wl_g_predict, wl_g, amp_g, l_g)
+    V12_h = get_V12(wl_h_predict, wl_h, amp_h, l_h)
+    V12 = V12_f + V12_g + V12_h
+
+    V22_f = get_V22(wl_f, amp_f, l_f)
+    V22_g = get_V22(wl_g, amp_g, l_g)
+    V22_h = get_V22(wl_h, amp_h, l_h)
+    V22 = V22_f + V22_g + V22_h + sigma_fgh**2 * np.eye(len(V22_f))
+
+    factor, flag = cho_factor(V22)
+
+    mu = mu_fgh + np.dot(V12.T, cho_solve((factor, flag), (fl_fgh - mu_fgh)))
+    Sigma = V11 - np.dot(V12, cho_solve((factor, flag), V12.T))
+
+    return mu, Sigma
+
+def lnlike_GP(V11, wl_known, fl_known, sigma_known, amp, lv, mu_GP=1.):
+
+    if  amp < 0.0 or lv < 0.0:
+        return -np.inf
+
+    matrix_functions.fill_V11_one(V11, wl_known, amp, lv)
+    V11[np.diag_indices_from(V11)] += sigma_known**2
+
+    factor, flag = cho_factor(V11)
+
+    logdet = np.sum(2 * np.log((np.diag(factor))))
+
+    return -0.5 * (np.dot((fl_known - mu_GP).T, cho_solve((factor, flag), (fl_known - mu_GP))) + logdet)
+
+def optimize_GP_one(wl_known, fl_known, sigma_known, amp_f, l_f, mu_GP=1.0):
+    '''
+    Optimize the GP hyperparameters for the given slice of data. Amp and lv are starting guesses.
+    '''
+    N = len(wl_known)
+    V11 = np.empty((N,N), dtype=np.float64)
+
+    def func(x):
+        try:
+            a, l = x
+            return -lnlike_GP(V11, wl_known, fl_known, sigma_known, a, l, mu_GP)
+        except np.linalg.linalg.LinAlgError:
+            return np.inf
+
+    ans = minimize(func, np.array([amp_f, l_f]), method="Nelder-Mead")
+
+    return ans["x"]
+
+def optimize_epoch_velocity(wl_epoch, fl_epoch, sigma_epoch, wl_fixed, fl_fixed, sigma_fixed, amp_f, l_f, mu_GP=1.0):
+    '''
+    Optimize the wavelengths of the chosen epoch relative to the fixed wavelengths. Identify the velocity required to redshift the chosen epoch.
+    '''
+
+    fl = np.concatenate((fl_epoch, fl_fixed)).flatten()
+    sigma = np.concatenate((sigma_epoch, sigma_fixed)).flatten()
+
+    def func(v):
+        try:
+            # Doppler shift the input wl_epoch
+            wl_shift = redshift(wl_epoch, v)
+
+            # Reconcatenate spectra into 1D array
+            wl = np.concatenate((wl_shift, wl_fixed)).flatten()
+            return -lnlike_GP(wl, fl, sigma, amp_f, l_f, mu_GP)
+        except np.linalg.linalg.LinAlgError:
+            return np.inf
+
+    ans = minimize(func, np.array([0.0]), method="Nelder-Mead")
+
+    # The velocity returned is the amount that was required to redshift wl_epoch to line up with wl_fixed.
+
+    return ans["x"][0]
+
+def optimize_epoch_velocity_cache(wl, fl, sigma, amp_f, l_f, mu_GP=1.0):
+    '''
+    Given a block of spectra in decreasing order of signal to noise, optimize the velocity of each spectrum to the first epoch, register the spectrum, and determine better fitting solutions as we go on.
+    '''
+    n_epochs, n_pix = wl.shape
+
+    wl_out = np.copy(wl)
+
+    # Calculate B for the first epoch.
+    B = get_V11(wl_out[0], sigma_fixed[0], amp, l_f)
+
+    for i in range(1, n_epochs):
+
+        # The epoch we want to optimize velocity for
+        wl_shift = wl_out[i]
+        fl_shift = fl[i]
+        sigma_shift = sigma[i]
+
+        # Temporary arrays without the epoch we just chose, already registered to highest S/N.
+        wl_reg = wl_out[0:i]
+        fl_reg = fl[0:i]
+        sigma_remain = sigma[0:i]
+
+        def func(v):
+            try:
+                # Doppler shift the input wl_epoch
+                wl_shifted = wl_shift * np.sqrt((C.c_kms + v)/(C.c_kms - v))
+
+                # Recompute the changed covar matrices
+                A = get_V11(wl_shifted, sigma_shift, amp_f, l_f)
+                C = get_V12(wl_shifted, wl_reg, amp_f, l_f)
+
+                # Evaluate the likelihood
+                # factor, flag = cho_factor(V11)
+                #
+                # logdet = np.sum(2 * np.log((np.diag(factor))))
+                #
+                # return -0.5 * (np.dot((fl_known - 1).T, cho_solve((factor, flag), (fl_known -1))) + logdet)
+                #
+                #
+                #
+                # return -lnlike_GP(wl, fl, sigma, amp_f, l_f)
+            except np.linalg.linalg.LinAlgError:
+                return np.inf
+
+        # ans = minimize(func, np.array([0.0]), method="Nelder-Mead")
+
+    return None
+
+def optimize_calibration(wl_cal, fl_cal, sigma_cal, wl_fixed, fl_fixed, sigma_fixed, amp, l_f, mu_GP=1.0):
+    '''
+    Determine the calibration parameters for this epoch of observations.
+    Assumes all wl, fl arrays are 1D.
+
+    returns a corrected fl_cal, as well as c0 and c1
+    '''
+
+    A = get_V11(wl_cal, sigma_cal, amp, l_f)
+    B = get_V11(wl_fixed, sigma_fixed, amp, l_f)
+    C = get_V12(wl_cal, wl_fixed, amp, l_f)
+
+    # For now, only include c0, c1. Could later expand to c2, c3, as well as Chebyshev, etc.
+    D = fl_cal[:,np.newaxis] * np.array([np.ones_like(fl_cal), wl_cal]).T
+
+    # Solve for the calibration coefficients c0, c1
+
+    # Find B^{-1}, fl_prime, and C_prime
+    B_cho = cho_factor(B)
+    fl_prime = mu_GP + np.dot(C, cho_solve(B_cho, (fl_fixed.flatten() - mu_GP)))
+    C_prime = A - np.dot(C, cho_solve(B_cho, C.T))
+
+    # Find {C^\prime}^{-1}
+    CP_cho = cho_factor(C_prime)
+
+    # Invert the least squares problem
+    left = np.dot(D.T, cho_solve(CP_cho, D))
+    right = np.dot(D.T, cho_solve(CP_cho, fl_prime))
+
+    left_cho = cho_factor(left)
+
+    # the coefficents, X = [c0, c1]
+    X = cho_solve(left_cho, right)
+
+    # Check that we have the right shapes.
+    line = X[0] + X[1] * wl_cal
+
+    # Apply the correction
+    fl_cor = np.dot(D, X)
+
+    return fl_cor, X
+
+
+def cycle_calibration(wl, fl, sigma, amp_f, l_f, ncycles, limit_array=3, mu_GP=1.0):
+    '''
+    Given a chunk of spectra, cycle n_cycles amongst all spectra and return the spectra with inferred calibration adjustments.
+
+    Only use `limit_array` number of spectra to save memory.
+    '''
+    fl_out = np.copy(fl)
+
+    n_epochs = len(wl)
+
+    for cycle in range(ncycles):
+        for i in range(1, n_epochs):
+            wl_tweak = wl[i]
+            fl_tweak = fl_out[i]
+            sigma_tweak = sigma[i]
+
+            # Temporary arrays without the epoch we just chose
+            wl_remain = np.delete(wl, i, axis=0)[0:limit_array]
+            fl_remain = np.delete(fl_out, i, axis=0)[0:limit_array]
+            sigma_remain = np.delete(sigma, i, axis=0)[0:limit_array]
+
+            # optimize the calibration of "tweak" with respect to all other orders
+            fl_cor, X = optimize_calibration(wl_tweak, fl_tweak, sigma_tweak, wl_remain.flatten(), fl_remain.flatten(), sigma_remain.flatten(), amp_f, l_f, mu_GP=mu_GP)
+
+            # replace this epoch with the corrected fluxes
+            fl_out[i] = fl_cor
+
+    return fl_out
+
+
+
+def cycle_velocities():
+    '''
+    Given a chunk of spectra (multiple epochs), cycle amongst all spectra, registering all to the
+    velocity frame of the first epoch, assuming one spectral component.
+    '''
+    pass
