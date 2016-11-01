@@ -1,5 +1,6 @@
 # encoding: utf-8
 # cython: profile=True
+# cython: linetrace=True
 # filename: matrix_functions.pyx
 
 import numpy as np
@@ -57,7 +58,7 @@ def fill_V11_one(np.ndarray[np.double_t, ndim=2] mat, np.ndarray[np.double_t, nd
     for i in range(N):
         mat[i,i] = amp2f
 
-    return mat
+    # No return
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -92,13 +93,12 @@ def fill_V12_one(np.ndarray[np.double_t, ndim=2] mat, np.ndarray[np.double_t, nd
 
         rf = c_kms/2.0 * (wl1 - wl0) / (wl1 + wl0)
 
-        cov = amp2f * exp(p2f * rf*rf)
+        cov = amp2f * exp(p2f * rf * rf)
 
-        # Enter this on both sides of the diagonal, since the matrix is symmetric
+        # Enter this on just one side the diagonal, since the matrix is not symmetric
         mat[i,j] = cov
-        mat[j,i] = cov
 
-    return mat
+    # no return
 
 
 @cython.boundscheck(False)

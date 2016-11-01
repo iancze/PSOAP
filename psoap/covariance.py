@@ -1,6 +1,10 @@
 import numpy as np
+from numpy.polynomial import Chebyshev as Ch
+
 from scipy.linalg import cho_factor, cho_solve
 from scipy.optimize import minimize
+
+
 
 import psoap
 from psoap import constants as C
@@ -361,56 +365,96 @@ def optimize_epoch_velocity(wl_epoch, fl_epoch, sigma_epoch, wl_fixed, fl_fixed,
 
     return ans["x"][0]
 
-def optimize_epoch_velocity_cache(wl, fl, sigma, amp_f, l_f, mu_GP=1.0):
+# @profile
+def optimize_calibration(wl_cal, fl_cal, sigma_cal, wl_fixed, fl_fixed, sigma_fixed, amp, l_f, order=1, mu_GP=1.0):
     '''
-    Given a block of spectra in decreasing order of signal to noise, optimize the velocity of each spectrum to the first epoch, register the spectrum, and determine better fitting solutions as we go on.
+    Determine the calibration parameters for this epoch of observations.
+    Assumes all wl, fl arrays are 1D.
+
+    order is the Chebyshev order to use.
+
+    returns a corrected fl_cal, as well as c0 and c1
     '''
-    n_epochs, n_pix = wl.shape
 
-    wl_out = np.copy(wl)
 
-    # Calculate B for the first epoch.
-    B = get_V11(wl_out[0], sigma_fixed[0], amp, l_f)
+    N_A = len(wl_cal)
+    A = np.empty((N_A, N_A), dtype=np.float64)
 
-    for i in range(1, n_epochs):
+    N_B = len(wl_fixed)
+    B = np.empty((N_B, N_B), dtype=np.float64)
 
-        # The epoch we want to optimize velocity for
-        wl_shift = wl_out[i]
-        fl_shift = fl[i]
-        sigma_shift = sigma[i]
+    C = np.empty((N_A, N_B), dtype=np.float64)
 
-        # Temporary arrays without the epoch we just chose, already registered to highest S/N.
-        wl_reg = wl_out[0:i]
-        fl_reg = fl[0:i]
-        sigma_remain = sigma[0:i]
+    matrix_functions.fill_V11_one(A, wl_cal, amp, l_f)
+    matrix_functions.fill_V11_one(B, wl_fixed, amp, l_f)
+    matrix_functions.fill_V12_one(C, wl_cal, wl_fixed, amp, l_f)
 
-        def func(v):
-            try:
-                # Doppler shift the input wl_epoch
-                wl_shifted = wl_shift * np.sqrt((C.c_kms + v)/(C.c_kms - v))
+    # Add in sigmas
+    A[np.diag_indices_from(A)] += sigma_cal**2
+    B[np.diag_indices_from(B)] += sigma_fixed**2
 
-                # Recompute the changed covar matrices
-                A = get_V11(wl_shifted, sigma_shift, amp_f, l_f)
-                C = get_V12(wl_shifted, wl_reg, amp_f, l_f)
 
-                # Evaluate the likelihood
-                # factor, flag = cho_factor(V11)
-                #
-                # logdet = np.sum(2 * np.log((np.diag(factor))))
-                #
-                # return -0.5 * (np.dot((fl_known - 1).T, cho_solve((factor, flag), (fl_known -1))) + logdet)
-                #
-                #
-                #
-                # return -lnlike_GP(wl, fl, sigma, amp_f, l_f)
-            except np.linalg.linalg.LinAlgError:
-                return np.inf
+    # Get a clean set of the Chebyshev polynomials evaluated on the input wavelengths
+    T = []
+    for i in range(0, order + 1):
+        coeff = [0 for j in range(i)] + [1]
+        Chtemp = Ch(coeff, domain=[wl_cal[0], wl_cal[-1]])
+        Ttemp = Chtemp(wl_cal)
+        T += [Ttemp]
 
-        # ans = minimize(func, np.array([0.0]), method="Nelder-Mead")
+    T = np.array(T)
 
-    return None
 
-def optimize_calibration(wl_cal, fl_cal, sigma_cal, wl_fixed, fl_fixed, sigma_fixed, amp, l_f, mu_GP=1.0):
+    #
+    # import matplotlib.pyplot as plt
+    # for i in range(order):
+    #     plt.plot(wl_cal, T[i])
+    # # plt.plot(wl_cal, T[1])
+    # plt.show()
+    #
+    # print(T)
+    # print(T.shape)
+
+    # For now, only include c0, c1. Could later expand to c2, c3, as well as Chebyshev, etc.
+    # D = fl_cal[:,np.newaxis] * np.array([np.ones_like(fl_cal), wl_cal]).T
+    # D = ?
+
+    D = fl_cal[:,np.newaxis] * T.T
+
+
+    # Solve for the calibration coefficients c0, c1
+
+    # Find B^{-1}, fl_prime, and C_prime
+    try:
+        B_cho = cho_factor(B)
+    except np.linalg.linalg.LinAlgError:
+        print("Failed to solve matrix inverse. Calibration not valid.")
+        raise
+
+    fl_prime = mu_GP + np.dot(C, cho_solve(B_cho, (fl_fixed.flatten() - mu_GP)))
+    C_prime = A - np.dot(C, cho_solve(B_cho, C.T))
+
+    # Find {C^\prime}^{-1}
+    CP_cho = cho_factor(C_prime)
+
+    # Invert the least squares problem
+    left = np.dot(D.T, cho_solve(CP_cho, D))
+    right = np.dot(D.T, cho_solve(CP_cho, fl_prime))
+
+    left_cho = cho_factor(left)
+
+    # the coefficents, X = [c0, c1]
+    X = cho_solve(left_cho, right)
+
+    # Check that we have the right shapes.
+    line = X[0] + X[1] * wl_cal
+
+    # Apply the correction
+    fl_cor = np.dot(D, X)
+
+    return fl_cor, X
+
+def optimize_calibration_python(wl_cal, fl_cal, sigma_cal, wl_fixed, fl_fixed, sigma_fixed, amp, l_f, mu_GP=1.0):
     '''
     Determine the calibration parameters for this epoch of observations.
     Assumes all wl, fl arrays are 1D.
@@ -453,18 +497,23 @@ def optimize_calibration(wl_cal, fl_cal, sigma_cal, wl_fixed, fl_fixed, sigma_fi
     return fl_cor, X
 
 
-def cycle_calibration(wl, fl, sigma, amp_f, l_f, ncycles, limit_array=3, mu_GP=1.0):
+def cycle_calibration(wl, fl, sigma, amp_f, l_f, ncycles, order=1, limit_array=3, mu_GP=1.0, soften=1.0):
     '''
     Given a chunk of spectra, cycle n_cycles amongst all spectra and return the spectra with inferred calibration adjustments.
+
+    order : what order of Chebyshev polynomials to use. 1st order = line.
 
     Only use `limit_array` number of spectra to save memory.
     '''
     fl_out = np.copy(fl)
 
+    # Soften the sigmas a little bit
+    sigma = soften * sigma
+
     n_epochs = len(wl)
 
     for cycle in range(ncycles):
-        for i in range(1, n_epochs):
+        for i in range(n_epochs):
             wl_tweak = wl[i]
             fl_tweak = fl_out[i]
             sigma_tweak = sigma[i]
@@ -475,7 +524,7 @@ def cycle_calibration(wl, fl, sigma, amp_f, l_f, ncycles, limit_array=3, mu_GP=1
             sigma_remain = np.delete(sigma, i, axis=0)[0:limit_array]
 
             # optimize the calibration of "tweak" with respect to all other orders
-            fl_cor, X = optimize_calibration(wl_tweak, fl_tweak, sigma_tweak, wl_remain.flatten(), fl_remain.flatten(), sigma_remain.flatten(), amp_f, l_f, mu_GP=mu_GP)
+            fl_cor, X = optimize_calibration(wl_tweak, fl_tweak, sigma_tweak, wl_remain.flatten(), fl_remain.flatten(), sigma_remain.flatten(), amp_f, l_f, order=order, mu_GP=mu_GP)
 
             # replace this epoch with the corrected fluxes
             fl_out[i] = fl_cor
