@@ -267,7 +267,7 @@ class SB2:
         return (vAs, vBs)
 
 
-class SB3:
+class ST3:
     '''
     Techniques describing solving for a triple star orbit.
     '''

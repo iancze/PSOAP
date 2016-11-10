@@ -17,7 +17,7 @@ cdef double c_kms = 2.99792458e5 #km s^-1
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def fill_V11_one(np.ndarray[np.double_t, ndim=2] mat, np.ndarray[np.double_t, ndim=1] wl, double amp_f, double l_f):
+def fill_V11_f(np.ndarray[np.double_t, ndim=2] mat, np.ndarray[np.double_t, ndim=1] wl_f, double amp_f, double l_f):
 
     cdef int N = len(mat)
     cdef int i = 0
@@ -31,22 +31,22 @@ def fill_V11_one(np.ndarray[np.double_t, ndim=2] mat, np.ndarray[np.double_t, nd
     cdef double rf = 0.0
 
     # Temporary wavelength holder
-    cdef double wl0 = 0.0
-    cdef double wl1 = 0.0
+    cdef double wl_f0 = 0.0
+    cdef double wl_f1 = 0.0
 
     cdef double cov = 0.0
 
     #Loop over all the non-diagonal indices
     for i in range(N):
 
-      wl0 = wl[i]
+      wl_f0 = wl_f[i]
 
       for j in range(i):
 
-        wl1 = wl[j]
+        wl_f1 = wl_f[j]
 
         # Calculate the distance in km/s
-        rf = c_kms/2.0 * (wl1 - wl0) / (wl1 + wl0)
+        rf = c_kms/2.0 * (wl_f1 - wl_f0) / (wl_f1 + wl_f0)
 
         cov = amp2f * exp(p2f * rf * rf)
 
@@ -62,9 +62,9 @@ def fill_V11_one(np.ndarray[np.double_t, ndim=2] mat, np.ndarray[np.double_t, nd
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def fill_V12_one(np.ndarray[np.double_t, ndim=2] mat, np.ndarray[np.double_t, ndim=1] wl, np.ndarray[np.double_t, ndim=1] wl_predict, double amp_f, double l_f):
+def fill_V12_f(np.ndarray[np.double_t, ndim=2] mat, np.ndarray[np.double_t, ndim=1] wl_f, np.ndarray[np.double_t, ndim=1] wl_predict, double amp_f, double l_f):
 
-    cdef int M = len(wl)
+    cdef int M = len(wl_f)
     cdef int N = len(wl_predict)
     cdef int i = 0
     cdef int j = 0
@@ -77,21 +77,21 @@ def fill_V12_one(np.ndarray[np.double_t, ndim=2] mat, np.ndarray[np.double_t, nd
     cdef double rf = 0.0
 
     # Temporary wavelength holder
-    cdef double wl0 = 0.0
-    cdef double wl1 = 0.0
+    cdef double wl_f0 = 0.0
+    cdef double wl_f1 = 0.0
 
     cdef double cov = 0.0
 
     #Loop over all the non-diagonal indices
     for i in range(M):
 
-      wl0 = wl[i]
+      wl_f0 = wl_f[i]
 
       for j in range(N):
 
-        wl1 = wl_predict[j]
+        wl_f1 = wl_predict[j]
 
-        rf = c_kms/2.0 * (wl1 - wl0) / (wl1 + wl0)
+        rf = c_kms/2.0 * (wl_f1 - wl_f0) / (wl_f1 + wl_f0)
 
         cov = amp2f * exp(p2f * rf * rf)
 
@@ -103,7 +103,7 @@ def fill_V12_one(np.ndarray[np.double_t, ndim=2] mat, np.ndarray[np.double_t, nd
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def fill_V11_two(np.ndarray[np.double_t, ndim=2] mat, np.ndarray[np.double_t, ndim=1] wl_f, np.ndarray[np.double_t, ndim=1] wl_g, double amp_f, double l_f, double amp_g, double l_g):
+def fill_V11_f_g(np.ndarray[np.double_t, ndim=2] mat, np.ndarray[np.double_t, ndim=1] wl_f, np.ndarray[np.double_t, ndim=1] wl_g, double amp_f, double l_f, double amp_g, double l_g):
 
     cdef int N = len(mat)
     cdef int i = 0

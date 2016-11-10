@@ -4,8 +4,6 @@ from numpy.polynomial import Chebyshev as Ch
 from scipy.linalg import cho_factor, cho_solve
 from scipy.optimize import minimize
 
-
-
 import psoap
 from psoap import constants as C
 from psoap import matrix_functions
@@ -126,7 +124,7 @@ def get_V22(wl_predict, amp_f, l_f):
     return V22
 
 
-def predict_one(wl_known, fl_known, sigma_known, wl_predict, amp_f, l_f, mu_GP=1.0):
+def predict_f(wl_known, fl_known, sigma_known, wl_predict, amp_f, l_f, mu_GP=1.0):
 
     '''wl_known are known wavelengths.
     wl_predict are the prediction wavelengths.
@@ -135,7 +133,7 @@ def predict_one(wl_known, fl_known, sigma_known, wl_predict, amp_f, l_f, mu_GP=1
     # determine V11, V12, V21, and V22
     M = len(wl_known)
     V11 = np.empty((M, M), dtype=np.float64)
-    matrix_functions.fill_V11_one(V11, wl_known, amp_f, l_f)
+    matrix_functions.fill_V11_f(V11, wl_known, amp_f, l_f)
     # V11[np.diag_indices_from(V11)] += sigma_known**2
     V11 = V11 + sigma_known**2 * np.eye(M)
 
@@ -197,19 +195,24 @@ def predict_f_g(wl_f, wl_g, wl_fg, fl_fg, sigma_fg, mu_f, amp_f, l_f, mu_g, amp_
     # Cat these into a single vector
     mu_cat = np.hstack((mu_f, mu_g))
 
-    # for these blocks, set sigma nuggets to 0.0. Add in later.
-    V11_f = get_V11(wl_f.flatten(), 0.0, amp_f, l_f)
-    V11_g = get_V11(wl_g.flatten(), 0.0, amp_g, l_g)
-    V11_fg = V11_f + V11_g + sigma_fg**2 * np.eye(len(V11_f))
-    B = V11_fg
+    V11_f = np.empty((n_pix, n_pix), dtype=np.float)
+    V11_g = np.empty((n_pix, n_pix), dtype=np.float)
 
-    zeros = np.zeros((n_pix, n_pix))
-    A = np.vstack((np.hstack([V11_f, zeros]), np.hstack([zeros, V11_g])))
-    A = A + 1e-5 * np.eye(len(A)) # Add a small nugget term
-    C = np.vstack((V11_f, V11_g))
+    matrix_functions.fill_V11_f(V11_f, wl_f.flatten(), amp_f, l_f)
+    matrix_functions.fill_V11_f(V11_g, wl_g.flatten(), amp_g, l_g)
+
+    B = V11_f + V11_g
+    B[np.diag_indices_from(B)] += sigma_fg**2
 
     factor, flag = cho_factor(B)
 
+    zeros = np.zeros((n_pix, n_pix))
+    A = np.vstack((np.hstack([V11_f, zeros]), np.hstack([zeros, V11_g])))
+    A[np.diag_indices_from(A)] += 1e-5 # Add a small nugget term
+
+    C = np.vstack((V11_f, V11_g))
+
+    # the 1.0 signifies that mu_f + mu_g = mu_fg = 1
     mu = mu_cat + np.dot(C, cho_solve((factor, flag), fl_fg - 1.0))
     Sigma = A - np.dot(C, cho_solve((factor, flag), C.T))
 
@@ -220,17 +223,31 @@ def predict_f_g_sum(wl_f, wl_g, fl_fg, sigma_fg, wl_f_predict, wl_g_predict, mu_
     # Assert that wl_f and wl_g are the same length
     assert len(wl_f) == len(wl_g), "Input wavelengths must be the same length."
 
-    V11_f = get_V11(wl_f_predict, 0.0, amp_f, l_f)
-    V11_g = get_V11(wl_g_predict, 0.0, amp_g, l_g)
-    V11 = V11_f + V11_g + 1e-5 * np.eye(len(V11_f))
+    M = len(wl_f_predict)
+    N = len(wl_f)
 
-    V12_f = get_V12(wl_f_predict, wl_f, amp_f, l_f)
-    V12_g = get_V12(wl_g_predict, wl_g, amp_g, l_g)
+    V11_f = np.empty((M, M), dtype=np.float)
+    V11_g = np.empty((M, M), dtype=np.float)
+
+    matrix_functions.fill_V11_f(V11_f, wl_f_predict, amp_f, l_f)
+    matrix_functions.fill_V11_f(V11_g, wl_g_predict, amp_g, l_g)
+    V11 = V11_f + V11_g
+    V11[np.diag_indices_from(V11)] += 1e-5
+
+    V12_f = np.empty((M, N), dtype=np.float64)
+    V12_g = np.empty((M, N), dtype=np.float64)
+    matrix_functions.fill_V12_f(V12_f, wl_f_predict, wl_f, amp_f, l_f)
+    matrix_functions.fill_V12_f(V12_g, wl_g_predict, wl_g, amp_g, l_g)
     V12 = V12_f + V12_g
 
-    V22_f = get_V22(wl_f, amp_f, l_f)
-    V22_g = get_V22(wl_g, amp_g, l_g)
-    V22 = V22_f + V22_g + sigma_fg**2 * np.eye(len(V22_f))
+    V22_f = np.empty((N,N), dtype=np.float)
+    V22_g = np.empty((N,N), dtype=np.float)
+
+    # It's a square matrix, so we can just reuse fil_V11_f
+    matrix_functions.fill_V11_f(V22_f, wl_f, amp_f, l_f)
+    matrix_functions.fill_V11_f(V22_g, wl_g, amp_g, l_g)
+    V22 = V22_f + V22_g
+    V22[np.diag_indices_from(V22)] += sigma_fg**2
 
     factor, flag = cho_factor(V22)
 
@@ -308,7 +325,7 @@ def predict_f_g_h_sum(wl_f, wl_g, wl_h, fl_fgh, sigma_fgh, wl_f_predict, wl_g_pr
 
     return mu, Sigma
 
-def lnlike_one(V11, wl_f, fl, sigma, amp_f, l_f, mu_GP=1.):
+def lnlike_f(V11, wl_f, fl, sigma, amp_f, l_f, mu_GP=1.):
     '''
     V11 is a matrix to be allocated.
     wl_known, fl_known, and sigma_known are flattened 1D arrays.
@@ -318,7 +335,7 @@ def lnlike_one(V11, wl_f, fl, sigma, amp_f, l_f, mu_GP=1.):
         return -np.inf
 
     # Fill the matrix using fast cython routine.
-    matrix_functions.fill_V11_one(V11, wl_f, amp_f, l_f)
+    matrix_functions.fill_V11_f(V11, wl_f, amp_f, l_f)
     V11[np.diag_indices_from(V11)] += sigma**2
 
     try:
@@ -330,7 +347,7 @@ def lnlike_one(V11, wl_f, fl, sigma, amp_f, l_f, mu_GP=1.):
 
     return -0.5 * (np.dot((fl - mu_GP).T, cho_solve((factor, flag), (fl - mu_GP))) + logdet)
 
-def lnlike_two(V11, wl_f, wl_g, fl, sigma, amp_f, l_f, amp_g, l_g, mu_GP=1.):
+def lnlike_f_g(V11, wl_f, wl_g, fl, sigma, amp_f, l_f, amp_g, l_g, mu_GP=1.):
     '''
     V11 is a matrix to be allocated.
     wl_known, fl_known, and sigma_known are flattened 1D arrays.
@@ -340,7 +357,7 @@ def lnlike_two(V11, wl_f, wl_g, fl, sigma, amp_f, l_f, amp_g, l_g, mu_GP=1.):
         return -np.inf
 
     # Fill the matrix using fast cython routine.
-    matrix_functions.fill_V11_two(V11, wl_f, wl_g, amp_f, l_f, amp_g, l_g)
+    matrix_functions.fill_V11_f_g(V11, wl_f, wl_g, amp_f, l_f, amp_g, l_g)
     V11[np.diag_indices_from(V11)] += sigma**2
 
     try:

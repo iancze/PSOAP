@@ -73,7 +73,7 @@ def lnprob(p):
     wls_A = redshift(wls, -vAs[:,np.newaxis])
 
     # fill out covariance matrix
-    lnp = covariance.lnlike_one(V11, wls_A.flatten(), fl, sigma, amp_f, l_f)
+    lnp = covariance.lnlike_f(V11, wls_A.flatten(), fl, sigma, amp_f, l_f)
 
     return lnp
 
@@ -85,7 +85,6 @@ from emcee import MHSampler
 dim = len(utils.registered_params[config["model"]]) - len(config["fix_params"])
 
 # Read in starting parameters
-# p0 = np.array([5.0, 0.15, 10.0, 10.0, 0.0, 0.32, 6.4])
 p0 = utils.convert_dict(config["model"], config["fix_params"], **pars)
 
 try:
@@ -94,7 +93,6 @@ try:
 except:
     print("using hand-specified jumps")
     cov = utils.convert_dict(config["model"], config["fix_params"], **config["jumps"])**2
-    # cov = np.diag(np.array([0.1, 0.005, 2.0, 0.1, 0.1, 0.01, 0.1])**2)
 
 sampler = MHSampler(cov, dim, lnprob)
 
