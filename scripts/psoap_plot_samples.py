@@ -4,90 +4,40 @@ import argparse
 
 parser = argparse.ArgumentParser(description="Measure statistics across multiple chains.")
 parser.add_argument("--burn", type=int, default=0, help="How many samples to discard from the beginning of the chain for burn in.")
-parser.add_argument("--draw", type=int, help="If specified, print out a random sample of N draws from the posterior, after burn in.")
-parser.add_argument("--filter", type=float, default=0.0, help="Used in conjunction with --draw. Only take samples with lnprob this percentile[0 - 100) and above. Default is to take all.")
-parser.add_argument("--new_pos", help="If specified, create a new pos0 array with this filename using the number of walkers contained in draw.")
 parser.add_argument("--config", help="name of the config file used for the run.", default="config.yaml")
 parser.add_argument("--tri", help="Plot the triangle too.", action="store_true")
-parser.add_argument("--drop", action="store_true", help="Drop the samples which have lnp==-np.inf")
 parser.add_argument("--interactive", action="store_true", help="Pop up the walker window so that you can zoom around.")
+parser.add_argument("--cov", action="store_true", help="Estimate the optimal covariance to tune MH jumps.")
 
 args = parser.parse_args()
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+import psoap
+from psoap import utils
 
 # This first bit of code is run for every invocation of the script
-chain = np.load("chain.npy")
+flatchain = np.load("flatchain.npy")
+flatchain = flatchain[args.burn:]
 
-# Load the lnprobabilities
+# Load the lnprobabilities and truncate for burn in
 lnprobs = np.load("lnprob.npy")
-# Truncate for burn in, shape (nwalkers, niter)
-lnprobs = lnprobs[:, args.burn:]
+lnprobs = lnprobs[args.burn:]
 
-flat_lnprobs = lnprobs.flatten()
+niter, ndim = flatchain.shape
 
-# Set a colorscale for the lnprobs
-cmap = matplotlib.cm.get_cmap("brg")
-
-final_lnprobs = lnprobs[:, -1]
-norm = matplotlib.colors.Normalize(vmin=np.min(final_lnprobs), vmax=np.max(final_lnprobs))
-
-# Determine colors based on the ending lnprob of each walker
-colors = [cmap(norm(val)) for val in final_lnprobs]
-
-# Truncate burn in from chain
-chain = chain[:, args.burn:, :]
-
-# Convention within the Julia EnsembleSampler is
-# ndim, niter, nwalkers = chain.shape
-# However, when written to disk, we should have been following the emcee convention
-nwalkers, niter, ndim = chain.shape
-
-print("Previous run used {} walkers.".format(nwalkers))
-
-nsamples = nwalkers * niter
-# Flatchain is made after the walkers have been burned
-flatchain = np.reshape(chain, (nsamples, ndim))
-
-# Keep only the samples which haven't evaluated to -np.inf (the prior disallows them). This usually originates from using a starting position which is already outside the prior.
-if args.drop:
-    ind = flat_lnprobs > -np.inf
-    flat_lnprobs = flat_lnprobs[ind]
-    flatchain = flatchain[ind]
-
-nsamples = flatchain.shape[0]
-
-# Save it after cutting out burn-in and -np.inf samples
-print("Overwriting flatchain.npy")
-np.save("flatchain.npy", flatchain)
+if args.cov:
+    cov = utils.estimate_covariance(flatchain)
+    np.save("opt_jump.npy", cov)
 
 # If we can tell what type of model we were sampling, we can give everything appropriate labels.
-# Otherwise, we'll just use default indexes.
+import yaml
+f = open(args.config)
+config = yaml.load(f)
+f.close()
 
-
-# labels = [r"$q_inner$", r"$q_outer$", r"$a_f$", r"$l_a$", r"$a_g$", r"$l_g$", r"$a_h$", r"$l_h$"]
-labels = [r"$q_inner$", r"$q_outer$", r"$a_f$", r"$a_g$", r"$a_h$", r"$l$"]
-
-if args.draw is not None:
-    # draw samples from the posterior
-
-    # Take only those samples above some lnprob floor.
-    # This functionality allows us to discard problematic walkers carried over between runs.
-    floor = np.percentile(flat_lnprobs, args.filter)
-    flatchain_filtered = flatchain[(flat_lnprobs > floor)]
-
-    inds = np.random.randint(len(flatchain_filtered), size=args.draw)
-    pos0 = flatchain_filtered[inds]
-
-    for i in range(args.draw):
-        print(pos0[i])
-
-    if args.new_pos:
-        np.save(args.new_pos, pos0.T)
-
-    import sys
-    sys.exit()
+model = config["model"]
+labels = utils.get_labels(model, config["fix_params"])
 
 
 import matplotlib.pyplot as plt
@@ -99,23 +49,11 @@ iterations = np.arange(niter)
 step = 100
 
 #Plot the lnprob on top
-for j in range(nwalkers):
-    ax[0].plot(iterations, lnprobs[j], lw=0.15, color=colors[j])
-
-avg = np.average(lnprobs, axis=0)
-ax[0].plot(iterations, avg, lw=1.1, color="w")
-ax[0].plot(iterations, avg, lw=0.9, color="b")
+ax[0].plot(iterations, lnprobs, color="b")
 ax[0].set_ylabel("lnprob")
 
 for i in range(ndim):
-    for j in range(nwalkers):
-        ax[i +1].plot(iterations, chain[j, :, i], lw=0.15, color=colors[j])
-
-    # also plot the instanteous walker average to watch for drift
-    avg = np.average(chain[:, :, i], axis=0)
-    ax[i+1].plot(iterations, avg, lw=1.1, color="w")
-    ax[i+1].plot(iterations, avg, lw=0.9, color="b")
-
+    ax[i +1].plot(iterations, flatchain[:, i], color="k")
     ax[i+1].set_ylabel(labels[i])
 
 ax[-1].set_xlabel("Iteration")
@@ -124,7 +62,7 @@ if args.interactive:
     fig.subplots_adjust(bottom=0.0, top=1.0, right=1.0, hspace=0.0)
     plt.show()
 else:
-    fig.savefig("walkers.png", dpi=300)
+    fig.savefig("chain.png", dpi=300)
 
 def hdi(samples, bins=40):
 
@@ -194,13 +132,6 @@ try:
     plot_hdis(flatchain)
 except IndexError:
     pass
-
-# Compute the autocorrelation time, following emcee
-
-# and we can import autocorr here
-print("Autocorrelation time")
-from emcee import autocorr
-print(autocorr.integrated_time(np.mean(chain, axis=0), axis=0, window=50, fast=False))
 
 
 # Make the triangle plot

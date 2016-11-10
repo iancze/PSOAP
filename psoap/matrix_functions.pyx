@@ -58,7 +58,7 @@ def fill_V11_one(np.ndarray[np.double_t, ndim=2] mat, np.ndarray[np.double_t, nd
     for i in range(N):
         mat[i,i] = amp2f
 
-    # No return
+    # No return statetment
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
@@ -103,49 +103,46 @@ def fill_V12_one(np.ndarray[np.double_t, ndim=2] mat, np.ndarray[np.double_t, nd
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def get_V11_two(np.ndarray[np.double_t, ndim=2] mat, np.ndarray[np.double_t, ndim=1] wlA, np.ndarray[np.double_t, ndim=1] wlB, double amp_f, double l_f, double amp_g, double l_g):
+def fill_V11_two(np.ndarray[np.double_t, ndim=2] mat, np.ndarray[np.double_t, ndim=1] wl_f, np.ndarray[np.double_t, ndim=1] wl_g, double amp_f, double l_f, double amp_g, double l_g):
 
     cdef int N = len(mat)
     cdef int i = 0
     cdef int j = 0
 
+    # Compute the squared values of these to save time within the for-loop
     cdef double amp2f = amp_f*amp_f
     cdef double p2f = -0.5/(l_f*l_f)
+
     cdef double amp2g = amp_g*amp_g
     cdef double p2g = -0.5/(l_g*l_g)
+
+    # Temporary distance holders
     cdef double rf = 0.0
-
-    cdef double wlA0 = 0.0
-    cdef double wlA1 = 0.0
-
     cdef double rg = 0.0
 
-    cdef double wlB0 = 0.0
-    cdef double wlB1 = 0.0
+    # Temporary wavelength holders
+    cdef double wl_f0 = 0.0
+    cdef double wl_f1 = 0.0
+    cdef double wl_g0 = 0.0
+    cdef double wl_g1 = 0.0
 
     cdef double cov = 0.0
 
     #Loop over all the non-diagonal indices
     for i in range(N):
 
-      wlA0 = wlA[i]
-      wlB0 = wlB[i]
+      wl_f0 = wl_f[i]
+      wl_g0 = wl_g[i]
 
       for j in range(i):
 
         # Just indexing each is very slow.
-        wlA1 = wlA[j]
-        wlB1 = wlB[j]
+        wl_f1 = wl_f[j]
+        wl_g1 = wl_g[j]
 
-        # Initilize [i,j] and [j,i]
         # Calculate the distance in km/s
-        # df = (wlA1 - wlA0) # km/s
-        # rf = c_kms * df / (wlA0 + 0.5 * df)
-        rf = c_kms * (wlA1 - wlA0) / wlA0
-        #
-        # dg = (wlB1 - wlB0) # km/s
-        # rf = c_kms * dg / (wlB0 + 0.5 * dg)
-        rg = c_kms * (wlB1 - wlB0) / wlB0
+        rf = c_kms/2.0 * (wl_f1 - wl_f0) / (wl_f1 + wl_f0)
+        rg = c_kms/2.0 * (wl_g1 - wl_g0) / (wl_g1 + wl_g0)
 
         cov = amp2f * exp(p2f * rf*rf) + amp2g * exp(p2g * rg*rg)
 
@@ -157,7 +154,7 @@ def get_V11_two(np.ndarray[np.double_t, ndim=2] mat, np.ndarray[np.double_t, ndi
     for i in range(N):
         mat[i,i] = amp2f + amp2g
 
-    return mat
+    # No return statement
 
 
 @cython.boundscheck(False)

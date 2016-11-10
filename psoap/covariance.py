@@ -308,19 +308,49 @@ def predict_f_g_h_sum(wl_f, wl_g, wl_h, fl_fgh, sigma_fgh, wl_f_predict, wl_g_pr
 
     return mu, Sigma
 
-def lnlike_GP(V11, wl_known, fl_known, sigma_known, amp, lv, mu_GP=1.):
+def lnlike_one(V11, wl_f, fl, sigma, amp_f, l_f, mu_GP=1.):
+    '''
+    V11 is a matrix to be allocated.
+    wl_known, fl_known, and sigma_known are flattened 1D arrays.
 
-    if  amp < 0.0 or lv < 0.0:
+    '''
+    if  amp_f < 0.0 or l_f < 0.0:
         return -np.inf
 
-    matrix_functions.fill_V11_one(V11, wl_known, amp, lv)
-    V11[np.diag_indices_from(V11)] += sigma_known**2
+    # Fill the matrix using fast cython routine.
+    matrix_functions.fill_V11_one(V11, wl_f, amp_f, l_f)
+    V11[np.diag_indices_from(V11)] += sigma**2
 
-    factor, flag = cho_factor(V11)
+    try:
+        factor, flag = cho_factor(V11)
+    except np.linalg.linalg.LinAlgError:
+        return -np.inf
 
     logdet = np.sum(2 * np.log((np.diag(factor))))
 
-    return -0.5 * (np.dot((fl_known - mu_GP).T, cho_solve((factor, flag), (fl_known - mu_GP))) + logdet)
+    return -0.5 * (np.dot((fl - mu_GP).T, cho_solve((factor, flag), (fl - mu_GP))) + logdet)
+
+def lnlike_two(V11, wl_f, wl_g, fl, sigma, amp_f, l_f, amp_g, l_g, mu_GP=1.):
+    '''
+    V11 is a matrix to be allocated.
+    wl_known, fl_known, and sigma_known are flattened 1D arrays.
+
+    '''
+    if  amp_f < 0.0 or l_f < 0.0 or amp_g < 0.0 or l_g < 0.0:
+        return -np.inf
+
+    # Fill the matrix using fast cython routine.
+    matrix_functions.fill_V11_two(V11, wl_f, wl_g, amp_f, l_f, amp_g, l_g)
+    V11[np.diag_indices_from(V11)] += sigma**2
+
+    try:
+        factor, flag = cho_factor(V11)
+    except np.linalg.linalg.LinAlgError:
+        return -np.inf
+
+    logdet = np.sum(2 * np.log((np.diag(factor))))
+
+    return -0.5 * (np.dot((fl - mu_GP).T, cho_solve((factor, flag), (fl - mu_GP))) + logdet)
 
 def optimize_GP_one(wl_known, fl_known, sigma_known, amp_f, l_f, mu_GP=1.0):
     '''
@@ -376,7 +406,6 @@ def optimize_calibration(wl_cal, fl_cal, sigma_cal, wl_fixed, fl_fixed, sigma_fi
     returns a corrected fl_cal, as well as c0 and c1
     '''
 
-
     N_A = len(wl_cal)
     A = np.empty((N_A, N_A), dtype=np.float64)
 
@@ -404,20 +433,6 @@ def optimize_calibration(wl_cal, fl_cal, sigma_cal, wl_fixed, fl_fixed, sigma_fi
 
     T = np.array(T)
 
-
-    #
-    # import matplotlib.pyplot as plt
-    # for i in range(order):
-    #     plt.plot(wl_cal, T[i])
-    # # plt.plot(wl_cal, T[1])
-    # plt.show()
-    #
-    # print(T)
-    # print(T.shape)
-
-    # For now, only include c0, c1. Could later expand to c2, c3, as well as Chebyshev, etc.
-    # D = fl_cal[:,np.newaxis] * np.array([np.ones_like(fl_cal), wl_cal]).T
-    # D = ?
 
     D = fl_cal[:,np.newaxis] * T.T
 
@@ -530,12 +545,3 @@ def cycle_calibration(wl, fl, sigma, amp_f, l_f, ncycles, order=1, limit_array=3
             fl_out[i] = fl_cor
 
     return fl_out
-
-
-
-def cycle_velocities():
-    '''
-    Given a chunk of spectra (multiple epochs), cycle amongst all spectra, registering all to the
-    velocity frame of the first epoch, assuming one spectral component.
-    '''
-    pass

@@ -3,18 +3,17 @@ from scipy.optimize import fsolve, minimize
 
 from psoap import constants as C
 
-class Binary:
+class SB1:
     '''
-    Techniques describing solving for a binary orbit.
+    Describing a single-line Spectroscopic binary.
     '''
-    def __init__(self, q, K, e, omega, P, T0, gamma, obs_dates=None):
-        self.q = q # [M2/M1]
-        self.K = K # [km/s]
-        self.e = e
-        self.omega = omega # [deg]
-        self.P = P # [days]
-        self.T0 = T0 # [JD]
-        self.gamma = gamma # [km/s]
+    def __init__(self, K, e, omega, P, T0, gamma, obs_dates=None):
+        self._K = K # [km/s]
+        self._e = e
+        self._omega = omega # [deg]
+        self._P = P # [days]
+        self._T0 = T0 # [JD]
+        self._gamma = gamma # [km/s]
 
         # If we are going to be repeatedly predicting the orbit at a sequence of dates,
         # just store them to the object.
@@ -22,60 +21,52 @@ class Binary:
 
     # Properties so that we can easily update subsets of the orbit.
     @property
-    def q(self):
-        return self.q
-
-    @q.setter
-    def q(self, value):
-        self.q = value
-
-    @property
     def K(self):
-        return self.K
+        return self._K
 
     @K.setter
     def K(self, value):
-        self.K = value
+        self._K = value
 
     @property
     def e(self):
-        return self.e
+        return self._e
 
     @e.setter
     def e(self, value):
-        self.e = value
+        self._e = value
 
     @property
     def omega(self):
-        return self.omega
+        return self._omega
 
     @omega.setter
     def omega(self, value):
-        self.omega = value
+        self._omega = value
 
     @property
     def P(self):
-        return self.P
+        return self._P
 
     @P.setter
     def P(self, value):
-        self.P = value
+        self._P = value
 
     @property
     def T0(self):
-        return self.T0
+        return self._T0
 
     @T0.setter
     def T0(self, value):
-        self.T0 = value
+        self._T0 = value
 
     @property
     def gamma(self):
-        return self.gamma
+        return self._gamma
 
     @gamma.setter
     def gamma(self, value):
-        self.gamma = value
+        self._gamma = value
 
     def theta(self, t):
         '''Calculate the true anomoly for the A-B orbit.
@@ -84,14 +75,14 @@ class Binary:
         # t is input in seconds
 
         # Take a modulus of the period
-        t = (t - T0_inner) % P_inner
+        t = (t - self._T0) % self._P
 
-        f = lambda E: E - e_inner * np.sin(E) - 2 * np.pi * t/P_inner
-        E0 = 2 * np.pi * t / P_inner
+        f = lambda E: E - self._e * np.sin(E) - 2 * np.pi * t/self._P
+        E0 = 2 * np.pi * t / self._P
 
         E = fsolve(f, E0)[0]
 
-        th = 2 * np.arctan(np.sqrt((1 + e_inner)/(1 - e_inner)) * np.tan(E/2.))
+        th = 2 * np.arctan(np.sqrt((1 + self._e)/(1 - self._e)) * np.tan(E/2.))
 
         if E < np.pi:
             return th
@@ -102,7 +93,7 @@ class Binary:
         '''Calculate the component of A's velocity based on only the inner orbit.
         f is the true anomoly of this inner orbit.'''
 
-        return self.K * (np.cos(self.omega + f) + self.e * np.cos(self.omega))
+        return self._K * (np.cos(self._omega * np.pi/180 + f) + self._e * np.cos(self._omega * np.pi/180))
 
     def vA_t(self, t):
         '''
@@ -112,31 +103,163 @@ class Binary:
         f = self.theta(t)
 
         # Feed this into the orbit equation and add the systemic velocity
-        return self.v1_f(f) + gamma
+        return self.v1_f(f) + self._gamma
+
+
+    def get_component_velocities(self, dates=None):
+        '''
+        Return both vA and vB for all dates provided.
+        '''
+
+        if dates is None and self.obs_dates is None:
+            raise RuntimeError("Must provide input dates or specify observation dates upon creation of orbit object.")
+
+        if dates is None and self.obs_dates is not None:
+            dates = self.obs_dates
+
+        dates = np.atleast_1d(dates)
+
+        vAs = np.array([self.vA_t(date) for date in dates])
+
+        return vAs
+
+class SB2:
+    '''
+    Techniques describing solving for a binary orbit.
+    '''
+    def __init__(self, q, K, e, omega, P, T0, gamma, obs_dates=None):
+        self._q = q # [M2/M1]
+        self._K = K # [km/s]
+        self._e = e
+        self._omega = omega # [deg]
+        self._P = P # [days]
+        self._T0 = T0 # [JD]
+        self._gamma = gamma # [km/s]
+
+        # If we are going to be repeatedly predicting the orbit at a sequence of dates,
+        # just store them to the object.
+        self.obs_dates = obs_dates
+
+    # Properties so that we can easily update subsets of the orbit.
+    @property
+    def q(self):
+        return self._q
+
+    @q.setter
+    def q(self, value):
+        self._q = value
+
+    @property
+    def K(self):
+        return self._K
+
+    @K.setter
+    def K(self, value):
+        self._K = value
+
+    @property
+    def e(self):
+        return self._e
+
+    @e.setter
+    def e(self, value):
+        self._e = value
+
+    @property
+    def omega(self):
+        return self._omega
+
+    @omega.setter
+    def omega(self, value):
+        self._omega = value
+
+    @property
+    def P(self):
+        return self._P
+
+    @P.setter
+    def P(self, value):
+        self._P = value
+
+    @property
+    def T0(self):
+        return self._T0
+
+    @T0.setter
+    def T0(self, value):
+        self._T0 = value
+
+    @property
+    def gamma(self):
+        return self._gamma
+
+    @gamma.setter
+    def gamma(self, value):
+        self._gamma = value
+
+    def theta(self, t):
+        '''Calculate the true anomoly for the A-B orbit.
+        Input is in days.'''
+
+        # t is input in seconds
+
+        # Take a modulus of the period
+        t = (t - self._T0) % self._P
+
+        f = lambda E: E - self._e * np.sin(E) - 2 * np.pi * t/self._P
+        E0 = 2 * np.pi * t / self._P
+
+        E = fsolve(f, E0)[0]
+
+        th = 2 * np.arctan(np.sqrt((1 + self._e)/(1 - self._e)) * np.tan(E/2.))
+
+        if E < np.pi:
+            return th
+        else:
+            return th + 2 * np.pi
+
+    def v1_f(self, f):
+        '''Calculate the component of A's velocity based on only the inner orbit.
+        f is the true anomoly of this inner orbit.'''
+
+        return self._K * (np.cos(self._omega * np.pi/180 + f) + self._e * np.cos(self._omega * np.pi/180))
+
+    def vA_t(self, t):
+        '''
+
+        '''
+        # Get the true anomoly "f" from time
+        f = self.theta(t)
+
+        # Feed this into the orbit equation and add the systemic velocity
+        return self.v1_f(f) + self._gamma
 
 
     def v2_f(self, f):
         '''Calculate the component of B's velocity based on only the inner orbit.
         f is the true anomoly of this inner orbit.'''
 
-        return -self.K/self.q * (np.cos(self.omega + f) + self.e * np.cos(self.omega))
+        return -self._K/self._q * (np.cos(self._omega * np.pi/180 + f) + self._e * np.cos(self._omega * np.pi/180))
 
     def vB_t(self, t):
         f = self.theta(t)
 
         # Feed this into the orbit equation and add the systemic velocity
-        return self.v2_f(f) + gamma
+        return self.v2_f(f) + self._gamma
 
-    def get_component_velocities(dates=None):
+
+    def get_component_velocities(self, dates=None):
         '''
         Return both vA and vB for all dates provided.
         '''
+
+        if dates is None and self.obs_dates is None:
+            raise RuntimeError("Must provide input dates or specify observation dates upon creation of orbit object.")
+
         if dates is None and self.obs_dates is not None:
             dates = self.obs_dates
-        else:
-            raise Error("Must provide input dates or specify observation dates upon creation of orbit object.")
 
-        dates = np.at_least1D(dates)
+        dates = np.atleast_1d(dates)
 
         vAs = np.array([self.vA_t(date) for date in dates])
         vBs = np.array([self.vB_t(date) for date in dates])
@@ -144,11 +267,11 @@ class Binary:
         return (vAs, vBs)
 
 
-class Triple:
+class SB3:
     '''
     Techniques describing solving for a triple star orbit.
     '''
-    def __init__(self, q_inner, K_inner, e_inner, omega_inner, P_inner, T0_inner, q_inner, K_outer, e_outer, omega_outer, P_outer, T0_outer, gamma, obs_dates=None):
+    def __init__(self, q_inner, K_inner, e_inner, omega_inner, P_inner, T0_inner, q_outer, K_outer, e_outer, omega_outer, P_outer, T0_outer, gamma, obs_dates=None):
         self.q_inner = q_inner # [M2/M1]
         self.K_inner = K_inner # [km/s]
         self.e_inner = e_inner
@@ -172,7 +295,7 @@ class Triple:
     def q_inner(self):
         return self.q_inner
 
-    @q.setter
+    @q_inner.setter
     def q_inner(self, value):
         self.q_inner = value
 
@@ -180,7 +303,7 @@ class Triple:
     def K_inner(self):
         return self.K_inner
 
-    @K.setter
+    @K_inner.setter
     def K_inner(self, value):
         self.K_inner = value
 
@@ -188,7 +311,7 @@ class Triple:
     def e_inner(self):
         return self.e_inner
 
-    @e.setter
+    @e_inner.setter
     def e_inner(self, value):
         self.e_inner = value
 
@@ -196,7 +319,7 @@ class Triple:
     def omega_inner(self):
         return self.omega_inner
 
-    @omega.setter
+    @omega_inner.setter
     def omega_inner(self, value):
         self.omega_inner = value
 
@@ -204,7 +327,7 @@ class Triple:
     def P_inner(self):
         return self.P_inner
 
-    @P.setter
+    @P_inner.setter
     def P_inner(self, value):
         self.P_inner = value
 
@@ -212,7 +335,7 @@ class Triple:
     def T0_inner(self):
         return self.T0_inner
 
-    @T0.setter
+    @T0_inner.setter
     def T0_inner(self, value):
         self.T0_inner = value
 
@@ -220,7 +343,7 @@ class Triple:
     def q_outer(self):
         return self.q_outer
 
-    @q.setter
+    @q_outer.setter
     def q_outer(self, value):
         self.q_outer = value
 
@@ -228,7 +351,7 @@ class Triple:
     def K_outer(self):
         return self.K_outer
 
-    @K.setter
+    @K_outer.setter
     def K_outer(self, value):
         self.K_outer = value
 
@@ -236,7 +359,7 @@ class Triple:
     def e_outer(self):
         return self.e_outer
 
-    @e.setter
+    @e_outer.setter
     def e_outer(self, value):
         self.e_outer = value
 
@@ -244,7 +367,7 @@ class Triple:
     def omega_outer(self):
         return self.omega_outer
 
-    @omega.setter
+    @omega_outer.setter
     def omega_outer(self, value):
         self.omega_outer = value
 
@@ -252,7 +375,7 @@ class Triple:
     def P_outer(self):
         return self.P_outer
 
-    @P.setter
+    @P_outer.setter
     def P_outer(self, value):
         self.P_outer = value
 
@@ -260,7 +383,7 @@ class Triple:
     def T0_outer(self):
         return self.T0_outer
 
-    @T0.setter
+    @T0_outer.setter
     def T0_outer(self, value):
         self.T0_outer = value
 
@@ -318,14 +441,14 @@ class Triple:
     def v3_f(self, f):
         '''Calculate the velocity of (A-B) based only on the outer orbit.
         f is the true anomoly of the outer orbit'''
-        return  self.K_outer * (np.cos(self.omega_outer + f) + self.e_outer * np.cos(self.omega_outer))
+        return  self.K_outer * (np.cos(self.omega_outer * np.pi/180 + f) + self.e_outer * np.cos(self.omega_outer * np.pi/180))
 
 
     def v3_f_C(self, f):
         '''Calculate the velocity of C based only on the outer orbit.
         f is the true anomoly of the outer orbit
         '''
-        return -self.K_outer / self.q_outer * (np.cos(self.omega_outer + f) + self.e_outer * np.cos(self.omega_outer))
+        return -self.K_outer / self.q_outer * (np.cos(self.omega_outer * np.pi/180 + f) + self.e_outer * np.cos(self.omega_outer * np.pi/180))
 
 
     def vA_t(self, t):
@@ -359,17 +482,19 @@ class Triple:
 
         return v3 + self.gamma
 
-    def get_component_velocities(dates=None):
+
+    def get_component_velocities(self, dates=None):
         '''
-        Return vA, vB, and vC for all dates provided.
+        Return both vA and vB for all dates provided.
         '''
+
+        if dates is None and self.obs_dates is None:
+            raise RuntimeError("Must provide input dates or specify observation dates upon creation of orbit object.")
 
         if dates is None and self.obs_dates is not None:
             dates = self.obs_dates
-        else:
-            raise Error("Must provide input dates or specify observation dates upon creation of orbit object.")
 
-        dates = np.at_least1D(dates)
+        dates = np.atleast_1d(dates)
 
         vAs = np.array([self.vA_t(date) for date in dates])
         vBs = np.array([self.vB_t(date) for date in dates])
@@ -381,7 +506,7 @@ class Triple:
 def main():
 
     # Make some fake observations and parameters and see how they compare.
-    
+
     # Systemic velocity measured from the relative point of setting the highest S/N epoch (the latest one) to zero.
     gamma = 5.0 # km/s
 
