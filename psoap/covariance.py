@@ -180,7 +180,7 @@ def predict_python(wl_known, fl_known, sigma_known, wl_predict, amp_f, l_f, mu_G
     return (mu, Sigma)
 
 
-def predict_f_g(wl_f, wl_g, wl_fg, fl_fg, sigma_fg, mu_f, amp_f, l_f, mu_g, amp_g, l_g):
+def predict_f_g(wl_f, wl_g, fl_fg, sigma_fg, mu_f, amp_f, l_f, mu_g, amp_g, l_g):
     '''
     Given that f + g is the flux that we're modeling, jointly predict the components.
     '''
@@ -198,8 +198,8 @@ def predict_f_g(wl_f, wl_g, wl_fg, fl_fg, sigma_fg, mu_f, amp_f, l_f, mu_g, amp_
     V11_f = np.empty((n_pix, n_pix), dtype=np.float)
     V11_g = np.empty((n_pix, n_pix), dtype=np.float)
 
-    matrix_functions.fill_V11_f(V11_f, wl_f.flatten(), amp_f, l_f)
-    matrix_functions.fill_V11_f(V11_g, wl_g.flatten(), amp_g, l_g)
+    matrix_functions.fill_V11_f(V11_f, wl_f, amp_f, l_f)
+    matrix_functions.fill_V11_f(V11_g, wl_g, amp_g, l_g)
 
     B = V11_f + V11_g
     B[np.diag_indices_from(B)] += sigma_fg**2
@@ -208,7 +208,7 @@ def predict_f_g(wl_f, wl_g, wl_fg, fl_fg, sigma_fg, mu_f, amp_f, l_f, mu_g, amp_
 
     zeros = np.zeros((n_pix, n_pix))
     A = np.vstack((np.hstack([V11_f, zeros]), np.hstack([zeros, V11_g])))
-    A[np.diag_indices_from(A)] += 1e-5 # Add a small nugget term
+    # A[np.diag_indices_from(A)] += 1e-4 # Add a small nugget term
 
     C = np.vstack((V11_f, V11_g))
 

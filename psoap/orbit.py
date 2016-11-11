@@ -7,7 +7,7 @@ class SB1:
     '''
     Describing a single-line Spectroscopic binary.
     '''
-    def __init__(self, K, e, omega, P, T0, gamma, obs_dates=None):
+    def __init__(self, K, e, omega, P, T0, gamma, obs_dates=None, **kwargs):
         self._K = K # [km/s]
         self._e = e
         self._omega = omega # [deg]
@@ -127,7 +127,7 @@ class SB2:
     '''
     Techniques describing solving for a binary orbit.
     '''
-    def __init__(self, q, K, e, omega, P, T0, gamma, obs_dates=None):
+    def __init__(self, q, K, e, omega, P, T0, gamma, obs_dates=None, **kwargs):
         self._q = q # [M2/M1]
         self._K = K # [km/s]
         self._e = e
@@ -271,7 +271,7 @@ class ST3:
     '''
     Techniques describing solving for a triple star orbit.
     '''
-    def __init__(self, q_inner, K_inner, e_inner, omega_inner, P_inner, T0_inner, q_outer, K_outer, e_outer, omega_outer, P_outer, T0_outer, gamma, obs_dates=None):
+    def __init__(self, q_inner, K_inner, e_inner, omega_inner, P_inner, T0_inner, q_outer, K_outer, e_outer, omega_outer, P_outer, T0_outer, gamma, obs_dates=None, **kwargs):
         self.q_inner = q_inner # [M2/M1]
         self.K_inner = K_inner # [km/s]
         self.e_inner = e_inner
@@ -502,6 +502,8 @@ class ST3:
 
         return (vAs, vBs, vCs)
 
+
+models = {"SB1":SB1, "SB2":SB2, "ST3":ST3}
 
 def main():
 

@@ -74,7 +74,7 @@ def lnprob(p):
     wls_B = redshift(wls, -vBs[:,np.newaxis])
 
     # fill out covariance matrix
-    lnp = covariance.lnlike_two(V11, wls_A.flatten(), wls_B.flatten(), fl, sigma, amp_f, l_f, amp_g, l_g)
+    lnp = covariance.lnlike_f_g(V11, wls_A.flatten(), wls_B.flatten(), fl, sigma, amp_f, l_f, amp_g, l_g)
 
     return lnp
 
@@ -87,7 +87,7 @@ dim = len(utils.registered_params[config["model"]]) - len(config["fix_params"])
 p0 = utils.convert_dict(config["model"], config["fix_params"], **pars)
 
 try:
-    cov = np.load("opt_jump.npy")
+    cov = np.load(config["opt_jump"])
     print("using optimal jumps")
 except:
     print("using hand-specified jumps")
