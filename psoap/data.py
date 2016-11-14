@@ -59,7 +59,79 @@ class Spectrum:
         self.date = self.date[ind_sort]
         self.date1D = self.date1D[ind_sort]
         self.BCV = self.BCV[ind_sort]
-        
+
+
+class Chunk:
+    '''
+    Hold a chunk of data. Each chunk is shape (n_epochs, n_pix) and has components wl, fl, sigma, date, and mask (all the same length).
+    '''
+    def __init__(self, wl, fl, sigma, date, mask=None):
+        self.wl = wl
+        self.fl = fl
+        self.sigma = sigma
+        self.date = date
+        self.date1D = date[:,0]
+
+        if mask is None:
+            self.mask = np.ones_like(self.wl, dtype="bool")
+        else:
+            self.mask = mask
+        self.n_epochs, self.n_pix = self.wl.shape
+
+    def apply_mask(self):
+        '''
+        Apply the mask to all of the attributes, so now we return 1D arrays.
+        '''
+        self.wl = self.wl[self.mask]
+        self.fl = self.fl[self.mask]
+        self.sigma = self.sigma[self.mask]
+        self.date = self.date[self.mask]
+        self.N = len(self.wl)
+
+    @classmethod
+    def open(cls, order, wl0, wl1):
+        '''
+        Load a spectrum from a directory link pointing to HDF5 output.
+        :param fname: HDF5 file containing files on disk.
+        '''
+
+        #Open the HDF5 file, try to load each of these values.
+        fname = C.chunk_fmt.format(order, wl0, wl1) + ".hdf5"
+        import h5py
+        with h5py.File(fname, "r") as hdf5:
+            wl = hdf5["wl"][:]
+            fl = hdf5["fl"][:]
+            sigma = hdf5["sigma"][:]
+            date = hdf5["date"][:]
+            mask = np.array(hdf5["mask"][:], dtype="bool") # Make sure it is explicitly boolean mask
+
+        #Although the actual fluxes and errors may be reasonably stored as float32, we need to do
+        # all of the calculations in float64, and so we convert here.
+        #The wl must be stored as float64, because of precise velocity issues.
+        return cls(wl.astype(np.float64), fl.astype(np.float64), sigma.astype(np.float64), date.astype(np.float64), mask)
+
+    def save(self, order, wl0, wl1):
+        fname = C.chunk_fmt.format(order, wl0, wl1) + ".hdf5"
+        shape = self.wl.shape
+        import h5py
+        with h5py.File(fname, "w") as hdf5:
+
+            wl = hdf5.create_dataset("wl", shape, dtype="f8")
+            wl[:] = self.wl
+
+            fl = hdf5.create_dataset("fl", shape, dtype="f8")
+            fl[:] = self.fl
+
+            sigma = hdf5.create_dataset("sigma", shape, dtype="f8")
+            sigma[:] = self.sigma
+
+            date = hdf5.create_dataset("date", shape, dtype="f8")
+            date[:] = self.date
+
+            mask = hdf5.create_dataset("mask", shape, dtype="bool")
+            mask[:] = self.mask
+
+            hdf5.close()
 
 # Load the HDF5 files into global scope
 basedir = os.path.dirname(inspect.getfile(psoap))

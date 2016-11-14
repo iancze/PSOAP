@@ -16,4 +16,7 @@ import psoap
 basedir = os.path.dirname(inspect.getfile(psoap))
 
 shutil.copy(basedir + "/../data/config.{}.yaml".format(args.model), "config.yaml")
+shutil.copy(basedir + "/../data/chunks.dat", "chunks.dat")
+shutil.copy(basedir + "/../data/masks.dat", "masks.dat")
 print("Copied config file for {} model to current working directory as config.yaml".format(args.model))
+print("Copied chunks.dat and masks.dat to current working directory.")
