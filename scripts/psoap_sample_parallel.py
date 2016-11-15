@@ -20,11 +20,14 @@ except FileNotFoundError as e:
 from multiprocessing import Process, Pipe
 import os
 import numpy as np
+from astropy.io import ascii
 
 from psoap.samplers import StateSampler
 import psoap.constants as C
-from psoap.data import Chunk
+from psoap.data import Chunk, redshift
 from psoap import utils
+from psoap import orbit
+from psoap import covariance
 
 from scipy.linalg import cho_factor, cho_solve
 from numpy.linalg import slogdet
@@ -74,9 +77,10 @@ for chunk in chunks:
     chunkSpec.apply_mask()
     chunk_data.append(chunkSpec)
 
+pars = config["parameters"]
+
 # Set up the logger
-logging.basicConfig(format="%(asctime)s - %(levelname)s - %(name)s -  %(message)s", filename="{}log.log".format(
-    Starfish.routdir), level=logging.DEBUG, filemode="w", datefmt='%m/%d/%Y %I:%M:%S %p')
+logging.basicConfig(format="%(asctime)s - %(levelname)s - %(name)s -  %(message)s", filename="{}log.log".format(routdir), level=logging.DEBUG, filemode="w", datefmt='%m/%d/%Y %I:%M:%S %p')
 
 # Create a partial function which maps a vector of floats to parameters
 convert_vector_p = partial(utils.convert_vector, model=config["model"], fix_params=config["fix_params"], **pars)
@@ -102,8 +106,10 @@ class Worker:
         to the order are loaded with an `INIT` message call, which tells which key
         to initialize on in the `self.initialize()`.
         '''
-        self.lnprob = -np.inf
-        self.lnprob_last = -np.inf
+
+        # Choose which lnprob we will be using based off of the model type
+        lnprobs = {"SB1":self.lnprob_SB1, "SB2":self.lnprob_SB2, "ST3":self.lnprob_ST3}
+        self.lnprob = lnprobs[config["model"]]
 
         # The list of possible function calls we can make.
         self.func_dict = {"INIT": self.initialize,
@@ -135,14 +141,18 @@ class Worker:
         # Note that mask is already applied in loading step. This is to transform velocity shifts
         # Evaluated off of self.date1D
         self.mask = data.mask
+        self.date1D = data.date1D
 
-        self.logger = logging.getLogger("{} {}".format(self.__class__.__name__, self.order))
+        # Total number of wavelength points (after applying mask)
+        self.N = data.N
+
+        self.logger = logging.getLogger("{} {}".format(self.__class__.__name__, self.key))
         if self.debug:
             self.logger.setLevel(logging.DEBUG)
         else:
             self.logger.setLevel(logging.INFO)
 
-        self.logger.info("Initializing model on Spectrum {}, order {}.".format(self.spectrum_id, self.order_key))
+        self.logger.info("Initializing model on chunk {}.".format(self.key))
 
         # Possibly set up temporary holders for V11 matrix.
         # self.N is the length of the masked, flattened wl vector.
@@ -151,9 +161,6 @@ class Worker:
         # Create an orbit
         self.orb = orbit.models[config["model"]](**pars, obs_dates=self.date1D)
 
-        # Choose which lnprob we will be using based off of the model type
-        lnprobs = {"SB1":self.lnprob_SB1, "SB2":self.lnprob_SB2, "ST3":self.lnprob_ST3}
-        self.lnprob = lnprobs[config["model"]]
 
     def lnprob_SB1(self, p):
         '''
@@ -179,7 +186,7 @@ class Worker:
         vAs = self.orb.get_component_velocities()
 
         # shift wavelengths according to these velocities to rest-frame of A component
-        wls_A = redshift(self.chunk.wl, -vAs[:,np.newaxis][self.chunk.mask])
+        wls_A = redshift(self.wl, (-vAs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
 
         # fill out covariance matrix
         lnp = covariance.lnlike_f(self.V11, wls_A.flatten(), self.fl, self.sigma, amp_f, l_f)
@@ -205,18 +212,51 @@ class Worker:
         vAs, vBs = self.orb.get_component_velocities()
 
         # shift wavelengths according to these velocities to rest-frame of A component
-        wls_A = redshift(self.chunk.wl, -vAs[:,np.newaxis][self.chunk.mask])
-        wls_B = redshift(self.chunk.wl, -vBs[:,np.newaxis][self.chunk.mask])
+        wls_A = redshift(self.wl, (-vAs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
+        wls_B = redshift(self.wl, (-vBs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
 
         # fill out covariance matrix
-        lnp = covariance.lnlike_f_g(self.V11, wls_A.flatten(), wls_B.flatten(), self.chunk.fl, self.chunk.sigma, amp_f, l_f, amp_g, l_g)
+        lnp = covariance.lnlike_f_g(self.V11, wls_A.flatten(), wls_B.flatten(), self.fl, self.sigma, amp_f, l_f, amp_g, l_g)
 
         gc.collect()
 
         return lnp
 
     def lnprob_ST3(self, p):
-        raise NotImplementedError
+        # unroll p
+        q_in, K_in, e_in, omega_in, P_in, T0_in, q_out, K_out, e_out, omega_out, P_out, T0_out, gamma, amp_f, l_f, amp_g, l_g, amp_h, l_h = convert_vector_p(p)
+
+        # Update the orbit
+        self.orb.q_in = q_in
+        self.orb.K_in = K_in
+        self.orb.e_in = e_in
+        self.orb.omega_in = omega_in
+        self.orb.P_in = P_in
+        self.orb.T0_in = T0_in
+        self.orb.q_out = q_out
+        self.orb.K_out = K_out
+        self.orb.e_out = e_out
+        self.orb.omega_out = omega_out
+        self.orb.P_out = P_out
+        self.orb.T0_out = T0_out
+        self.orb.gamma = gamma
+
+        # predict velocities for each epoch
+        vAs, vBs, vCs = self.orb.get_component_velocities()
+
+        # shift wavelengths according to these velocities to rest-frame of A component
+        wls_A = redshift(self.wl, (-vAs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
+        wls_B = redshift(self.wl, (-vBs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
+        wls_C = redshift(self.wl, (-vCs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
+
+        # fill out covariance matrix
+        lnp = covariance.lnlike_f_g_h(self.V11, wls_A.flatten(), wls_B.flatten(), wls_C.flatten(), self.fl, self.sigma, amp_f, l_f, amp_g, l_g, amp_h, l_h)
+
+        gc.collect()
+
+        return lnp
+
+
 
     def finish(self, *args):
         '''
@@ -244,7 +284,7 @@ class Worker:
         Right now we only expect one function and one argument but this could
         be generalized to **args.
         '''
-        #info("brain")
+        # info("brain")
 
         fname, arg = self.conn.recv() # Waits here to receive a new message
         self.logger.debug("{} received message {}".format(os.getpid(), (fname, arg)))
@@ -265,26 +305,14 @@ class Worker:
             self.conn.send(response)
         return True
 
-class FlatWorker(Worker):
-    '''
-    Sample the theta parameters, while parallelizing the chunks.
-    '''
-    def initialize(self, key):
-        super().initialize(key)
-
-        # Set up p0 and the independent sampler, if necessary
-
-    def finish(self, *args):
-        super().finish(*args)
-        self.sampler.write(self.noutdir)
-
+# Moving forward, we have the option to subclass Worker if we want to alter routines.
 
 # We create one Order() in the main process. When the process forks, each
 # subprocess now has its own independent OrderModel instance.
 # Then, each forked model will be customized using an INIT command passed
 # through the PIPE.
 
-def initialize(model):
+def initialize(worker):
     # Fork a subprocess for each key: (spectra, order)
     pconns = {} # Parent connections
     cconns = {} # Child connections
@@ -293,9 +321,12 @@ def initialize(model):
     for key in chunk_keys:
         pconn, cconn = Pipe()
         pconns[key], cconns[key] = pconn, cconn
-        p = Process(target=model.brain, args=(cconn,))
+        p = Process(target=worker.brain, args=(cconn,))
         p.start()
         ps[key] = p
+
+    # print("created keys", chunk_keys)
+    # print("conns", pconns, cconns)
 
     # initialize each Model to a specific chunk
     for key, pconn in pconns.items():
@@ -347,36 +378,65 @@ def test():
 # thus, to really close a pipe, you need to close it in every subprocess.
 
 # Create the main sampling loop, which will sample the theta parameters across all chunks
-model = FlatWorker(debug=True)
+worker = Worker(debug=True)
 
 # Now that the different processes have been forked, initialize them
-pconns, cconns, ps = parallel.initialize(model)
+pconns, cconns, ps = initialize(worker)
 
-# Optionally load a user-defined prior
+# Optionally load a user-defined prior.
+def prior_SB1(p):
+    K, e, omega, P, T0, gamma, amp_f, l_f = convert_vector_p(p)
+
+    if K < 0.0 or e < 0.0 or e > 1.0 or P < 0.0 or omega < -180 or omega > 520 or amp_f < 0.0 or l_f < 0.0:
+        return -np.inf
+
+    else:
+        return 0.0
+
+def prior_SB2(p):
+    q, K, e, omega, P, T0, gamma, amp_f, l_f, amp_g, l_g = convert_vector_p(p)
+
+    if q < 0.0 or q > 1.0 or K < 0.0 or e < 0.0 or e > 1.0 or P < 0.0 or omega < -180 or omega > 520 or amp_f < 0.0 or l_f < 0.0:
+        return -np.inf
+    else:
+        return 0.0
+
+
+def prior_ST3(p):
+    q_in, K_in, e_in, omega_in, P_in, T0_in, q_out, K_out, e_out, omega_out, P_out, T0_out, gamma, amp_f, l_f, amp_g, l_g, amp_h, l_h = convert_vector_p(p)
+
+    if q_in < 0.0 or q_in > 1.0 or K_in < 0.0 or e_in < 0.0 or e_in > 1.0 or P_in < 0.0 or omega_in < -180 or omega_in > 520 or q_out < 0.0 or q_out > 1.0 or K_out < 0.0 or e_out < 0.0 or e_out > 1.0 or P_out < 0.0 or omega_out < -180 or omega_out > 520 or amp_f < 0.0 or l_f < 0.0 or amp_h < 0.0 or l_h < 0.0:
+        return -np.inf
+    else:
+        return 0.0
+
+
+priors = {"SB1":prior_SB1, "SB2":prior_SB2, "ST3":prior_ST3}
+prior = priors[config["model"]]
+
+# Otherwise, use the default priors.
 
 def lnprob(p):
 
-    # TODO Optionally apply a user-defined prior here
-
-    # Assume p is [K, e, omega, etc...]
+    lnprior = prior(p)
+    if lnprior == -np.inf:
+        return -np.inf
 
     #Distribute the calculation, one chunk to each process
     for (key, pconn) in pconns.items():
         pconn.send(("LNPROB", p))
 
     #Collect the answer from each process
-    lnps = np.empty(config["nchunks"])
+    lnps = np.empty(n_chunks)
     for i, pconn in enumerate(pconns.values()):
         lnps[i] = pconn.recv()
 
     # Calculate the summed lnprob
     s = np.sum(lnps)
 
-    # Add any priors
-    return s
+    # Add any the prior to the total
+    return s + lnprior
 
-
-# lnprobs = {"SB1":lnprob_SB1, "SB2":lnprob_SB2, "ST3":lnprob_ST3}
 
 # Import the Metropolis-hastings sampler to do the sampling in the top level parameters
 from emcee import MHSampler
@@ -393,7 +453,7 @@ try:
     print("using optimal jumps")
 except:
     print("using hand-specified jumps")
-    cov = utils.convert_dict(config["model"], config["fix_params"], **config["jumps"])**2
+    cov = utils.convert_dict(config["model"], config["fix_params"], **config["jumps"])**2 * np.eye(dim)
 
 sampler = MHSampler(cov, dim, lnprob)
 
@@ -403,8 +463,8 @@ for i, result in enumerate(sampler.sample(p0, iterations=config["samples"])):
 
 # Save the actual chain of samples
 print("Acceptance fraction", sampler.acceptance_fraction)
-np.save("lnprob.npy", sampler.lnprobability)
-np.save("flatchain.npy", sampler.flatchain)
+np.save(routdir + "lnprob.npy", sampler.lnprobability)
+np.save(routdir + "flatchain.npy", sampler.flatchain)
 
 # Kill all of the orders
 for pconn in pconns.values():

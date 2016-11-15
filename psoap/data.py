@@ -110,8 +110,8 @@ class Chunk:
         #The wl must be stored as float64, because of precise velocity issues.
         return cls(wl.astype(np.float64), fl.astype(np.float64), sigma.astype(np.float64), date.astype(np.float64), mask)
 
-    def save(self, order, wl0, wl1):
-        fname = C.chunk_fmt.format(order, wl0, wl1) + ".hdf5"
+    def save(self, order, wl0, wl1, prefix=""):
+        fname = prefix + C.chunk_fmt.format(order, wl0, wl1) + ".hdf5"
         shape = self.wl.shape
         import h5py
         with h5py.File(fname, "w") as hdf5:

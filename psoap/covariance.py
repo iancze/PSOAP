@@ -139,12 +139,12 @@ def predict_f(wl_known, fl_known, sigma_known, wl_predict, amp_f, l_f, mu_GP=1.0
 
     N = len(wl_predict)
     V12 = np.empty((M, N), dtype=np.float64)
-    matrix_functions.fill_V12_one(V12, wl_known, wl_predict, amp_f, l_f)
+    matrix_functions.fill_V12_f(V12, wl_known, wl_predict, amp_f, l_f)
 
     V22 = np.empty((N, N), dtype=np.float64)
     # V22 is the covariance between the prediction wavelengths
     # The routine to fill V11 is the same as V22
-    matrix_functions.fill_V11_one(V22, wl_predict, amp_f, l_f)
+    matrix_functions.fill_V11_f(V22, wl_predict, amp_f, l_f)
 
     # Find V11^{-1}
     factor, flag = cho_factor(V11)
@@ -369,6 +369,28 @@ def lnlike_f_g(V11, wl_f, wl_g, fl, sigma, amp_f, l_f, amp_g, l_g, mu_GP=1.):
 
     return -0.5 * (np.dot((fl - mu_GP).T, cho_solve((factor, flag), (fl - mu_GP))) + logdet)
 
+def lnlike_f_g_h(V11, wl_f, wl_g, wl_h, fl, sigma, amp_f, l_f, amp_g, l_g, amp_h, l_h, mu_GP=1.):
+    '''
+    V11 is a matrix to be allocated.
+    wl_known, fl_known, and sigma_known are flattened 1D arrays.
+
+    '''
+    if  amp_f < 0.0 or l_f < 0.0 or amp_g < 0.0 or l_g < 0.0 or amp_h < 0.0 or l_h < 0.0:
+        return -np.inf
+
+    # Fill the matrix using fast cython routine.
+    matrix_functions.fill_V11_f_g_h(V11, wl_f, wl_g, wl_h, amp_f, l_f, amp_g, l_g, amp_h, l_h)
+    V11[np.diag_indices_from(V11)] += sigma**2
+
+    try:
+        factor, flag = cho_factor(V11)
+    except np.linalg.linalg.LinAlgError:
+        return -np.inf
+
+    logdet = np.sum(2 * np.log((np.diag(factor))))
+
+    return -0.5 * (np.dot((fl - mu_GP).T, cho_solve((factor, flag), (fl - mu_GP))) + logdet)
+
 def optimize_GP_f(wl_known, fl_known, sigma_known, amp_f, l_f, mu_GP=1.0):
     '''
     Optimize the GP hyperparameters for the given slice of data. Amp and lv are starting guesses.
@@ -379,7 +401,7 @@ def optimize_GP_f(wl_known, fl_known, sigma_known, amp_f, l_f, mu_GP=1.0):
     def func(x):
         try:
             a, l = x
-            return -lnlike_GP(V11, wl_known, fl_known, sigma_known, a, l, mu_GP)
+            return -lnlike_f(V11, wl_known, fl_known, sigma_known, a, l, mu_GP)
         except np.linalg.linalg.LinAlgError:
             return np.inf
 
@@ -533,6 +555,9 @@ def cycle_calibration(wl, fl, sigma, amp_f, l_f, ncycles, order=1, limit_array=3
 
     Only use `limit_array` number of spectra to save memory.
     '''
+    wl0 = np.min(wl)
+    wl1 = np.max(wl)
+
     fl_out = np.copy(fl)
 
     # Soften the sigmas a little bit
@@ -552,7 +577,7 @@ def cycle_calibration(wl, fl, sigma, amp_f, l_f, ncycles, order=1, limit_array=3
             sigma_remain = np.delete(sigma, i, axis=0)[0:limit_array]
 
             # optimize the calibration of "tweak" with respect to all other orders
-            fl_cor, X = optimize_calibration(wl_tweak, fl_tweak, sigma_tweak, wl_remain.flatten(), fl_remain.flatten(), sigma_remain.flatten(), amp_f, l_f, order=order, mu_GP=mu_GP)
+            fl_cor, X = optimize_calibration(wl0, wl1, wl_tweak, fl_tweak, sigma_tweak, wl_remain.flatten(), fl_remain.flatten(), sigma_remain.flatten(), amp_f, l_f, order=order, mu_GP=mu_GP)
 
             # replace this epoch with the corrected fluxes
             fl_out[i] = fl_cor

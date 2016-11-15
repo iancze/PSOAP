@@ -7,7 +7,7 @@ registered_params = {"SB1": ["K", "e", "omega", "P", "T0", "gamma", "amp_f", "l_
 
 registered_labels = {"SB1": [r"$K$", r"$e$", r"$\omega$", r"$P$", r"$T_0$", r"$\gamma$", r"$a_f$", r"$l_f$"],
 "SB2": [r"$q$", r"$K$", r"$e$", r"$\omega$", r"$P$", r"$T_0$", r"$\gamma$", r"$a_f$", r"$l_g$", r"$a_g$", r"$l_g$"],
-"ST3": [r"$q_\mathrm{in}$", r"$K_\mathrm{in}$", r"$e_\mathrm{in}$", r"$\omega_\mathrm{in}$", r"$P_\mathrm{in}$", r"$T_{0,\mathrm{in}$", r"$q_\mathrm{out}$", r"$K_\mathrm{out}$", r"$e_\mathrm{out}$", r"$\omega_\mathrm{out}$", r"$P_\mathrm{out}$", r"$T_{0,\mathrm{out}$", r"$\gamma$", r"$a_f$", r"$l_g$", r"$a_g$", r"$l_g$", r"$a_h$", r"$l_h$"]}
+"ST3": [r"$q_\mathrm{in}$", r"$K_\mathrm{in}$", r"$e_\mathrm{in}$", r"$\omega_\mathrm{in}$", r"$P_\mathrm{in}$", r"$T_{0,\mathrm{in}}$", r"$q_\mathrm{out}$", r"$K_\mathrm{out}$", r"$e_\mathrm{out}$", r"$\omega_\mathrm{out}$", r"$P_\mathrm{out}$", r"$T_{0,\mathrm{out}}$", r"$\gamma$", r"$a_f$", r"$l_g$", r"$a_g$", r"$l_g$", r"$a_h$", r"$l_h$"]}
 
 # For example, if the config.yaml file specifies model as "SB1", then it must list all of these parameters under "SB1".
 
