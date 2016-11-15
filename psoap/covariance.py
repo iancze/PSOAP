@@ -369,7 +369,7 @@ def lnlike_f_g(V11, wl_f, wl_g, fl, sigma, amp_f, l_f, amp_g, l_g, mu_GP=1.):
 
     return -0.5 * (np.dot((fl - mu_GP).T, cho_solve((factor, flag), (fl - mu_GP))) + logdet)
 
-def optimize_GP_one(wl_known, fl_known, sigma_known, amp_f, l_f, mu_GP=1.0):
+def optimize_GP_f(wl_known, fl_known, sigma_known, amp_f, l_f, mu_GP=1.0):
     '''
     Optimize the GP hyperparameters for the given slice of data. Amp and lv are starting guesses.
     '''
@@ -412,8 +412,8 @@ def optimize_epoch_velocity(wl_epoch, fl_epoch, sigma_epoch, wl_fixed, fl_fixed,
 
     return ans["x"][0]
 
-# @profile
-def optimize_calibration(wl_cal, fl_cal, sigma_cal, wl_fixed, fl_fixed, sigma_fixed, amp, l_f, order=1, mu_GP=1.0):
+
+def optimize_calibration(wl0, wl1, wl_cal, fl_cal, sigma_cal, wl_fixed, fl_fixed, sigma_fixed, amp, l_f, order=1, mu_GP=1.0):
     '''
     Determine the calibration parameters for this epoch of observations.
     Assumes all wl, fl arrays are 1D.
@@ -431,9 +431,9 @@ def optimize_calibration(wl_cal, fl_cal, sigma_cal, wl_fixed, fl_fixed, sigma_fi
 
     C = np.empty((N_A, N_B), dtype=np.float64)
 
-    matrix_functions.fill_V11_one(A, wl_cal, amp, l_f)
-    matrix_functions.fill_V11_one(B, wl_fixed, amp, l_f)
-    matrix_functions.fill_V12_one(C, wl_cal, wl_fixed, amp, l_f)
+    matrix_functions.fill_V11_f(A, wl_cal, amp, l_f)
+    matrix_functions.fill_V11_f(B, wl_fixed, amp, l_f)
+    matrix_functions.fill_V12_f(C, wl_cal, wl_fixed, amp, l_f)
 
     # Add in sigmas
     A[np.diag_indices_from(A)] += sigma_cal**2
@@ -444,12 +444,11 @@ def optimize_calibration(wl_cal, fl_cal, sigma_cal, wl_fixed, fl_fixed, sigma_fi
     T = []
     for i in range(0, order + 1):
         coeff = [0 for j in range(i)] + [1]
-        Chtemp = Ch(coeff, domain=[wl_cal[0], wl_cal[-1]])
+        Chtemp = Ch(coeff, domain=[wl0, wl1])
         Ttemp = Chtemp(wl_cal)
         T += [Ttemp]
 
     T = np.array(T)
-
 
     D = fl_cal[:,np.newaxis] * T.T
 
@@ -477,9 +476,6 @@ def optimize_calibration(wl_cal, fl_cal, sigma_cal, wl_fixed, fl_fixed, sigma_fi
 
     # the coefficents, X = [c0, c1]
     X = cho_solve(left_cho, right)
-
-    # Check that we have the right shapes.
-    line = X[0] + X[1] * wl_cal
 
     # Apply the correction
     fl_cor = np.dot(D, X)
@@ -562,3 +558,60 @@ def cycle_calibration(wl, fl, sigma, amp_f, l_f, ncycles, order=1, limit_array=3
             fl_out[i] = fl_cor
 
     return fl_out
+
+def cycle_calibration_chunk(chunk, amp_f, l_f, n_cycles, order=1, limit_array=3, mu_GP=1.0, soften=1.0):
+    '''
+    Do the calibration on a chunk at at time, incorporating the masks.
+    '''
+
+    # Figure out the min and max wavelengths to set the domain of the Chebyshevs
+    wl0 = np.min(chunk.wl)
+    wl1 = np.max(chunk.wl)
+
+    # Temporary copy, so that we can do multiple cycle corrections.
+    fl_out = np.copy(chunk.fl)
+
+    # Soften the sigmas a little bit to prevent inversion errors.
+    sigma = soften * chunk.sigma
+
+    for cycle in range(n_cycles):
+        for i in range(chunk.n_epochs):
+            wl_tweak = chunk.wl[i]
+            fl_tweak = fl_out[i]
+            sigma_tweak = chunk.sigma[i]
+            mask_tweak = chunk.mask[i]
+
+            # Temporary arrays without the epoch we just chose
+            wl_remain = np.delete(chunk.wl, i, axis=0)[0:limit_array]
+            fl_remain = np.delete(fl_out, i, axis=0)[0:limit_array]
+            sigma_remain = np.delete(chunk.sigma, i, axis=0)[0:limit_array]
+            mask_remain = np.delete(chunk.mask, i, axis=0)[0:limit_array]
+
+            # optimize the calibration of "tweak" with respect to all other orders
+            fl_cor, X = optimize_calibration(wl0, wl1, wl_tweak[mask_tweak], fl_tweak[mask_tweak], sigma_tweak[mask_tweak], wl_remain[mask_remain], fl_remain[mask_remain], sigma_remain[mask_remain], amp_f, l_f, order=order, mu_GP=mu_GP)
+
+            # since fl_cor may have actually have fewer pixels than originally, we can't just
+            # stuff the corrected fluxes directly back into the array.
+            # Instead, we need to re-evaluate the line on all the wavelengths
+            # using the chebyshev coefficients, and apply this.
+            T = []
+            for k in range(0, order + 1):
+                pass
+                coeff = [0 for j in range(k)] + [1]
+                Chtemp = Ch(coeff, domain=[wl0, wl1])
+                Ttemp = Chtemp(wl_tweak)
+                T += [Ttemp]
+
+            T = np.array(T)
+
+            D = fl_tweak[:,np.newaxis] * T.T
+            # Apply the correction
+            fl_cor = np.dot(D, X)
+
+            # replace this epoch with the corrected fluxes
+            fl_out[i] = fl_cor
+
+    # Stuff the full set of corrected fluxes (masked points included) back into the chunk.
+    chunk.fl[:] = fl_out
+
+    # print(np.allclose(chunk.fl, fl_out))

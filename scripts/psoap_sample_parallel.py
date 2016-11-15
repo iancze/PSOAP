@@ -3,27 +3,8 @@
 import argparse
 
 parser = argparse.ArgumentParser(description="Sample the distribution across multiple chunks.")
-parser.add_argument("run_index", type=int, default=0, help="How many different orbital draws.")
+parser.add_argument("run_index", type=int, default=0, help="Which output subdirectory to save this particular run, in the case you may be running multiple concurrently.")
 args = parser.parse_args()
-
-
-from multiprocessing import Process, Pipe
-import os
-import numpy as np
-
-from psoap.samplers import StateSampler
-import psoap.constants as C
-
-from scipy.linalg import cho_factor, cho_solve
-from numpy.linalg import slogdet
-
-import gc
-import logging
-
-from itertools import chain
-from collections import deque
-from operator import itemgetter
-import shutil
 
 import yaml
 from functools import partial
@@ -35,6 +16,26 @@ try:
 except FileNotFoundError as e:
     print("You need to copy a config.yaml file to this directory, and then edit the values to your particular case.")
     raise
+
+from multiprocessing import Process, Pipe
+import os
+import numpy as np
+
+from psoap.samplers import StateSampler
+import psoap.constants as C
+from psoap.data import Chunk
+from psoap import utils
+
+from scipy.linalg import cho_factor, cho_solve
+from numpy.linalg import slogdet
+
+import gc
+import logging
+
+from itertools import chain
+from collections import deque
+from operator import itemgetter
+import shutil
 
 # Create an output directory to store the samples from this run
 run_index = args.run_index
@@ -56,17 +57,29 @@ shutil.copy("config.yaml", routdir + "config.yaml")
 #         print("Creating ", order_dir)
 #         os.makedirs(order_dir)
 
-config["nchunks"]
+# Load the list of chunks
+chunks = ascii.read(config["chunk_file"])
+print("Sampling the following chunks of data, one chunk per core.")
+print(chunks)
 
+n_chunks = len(chunks)
 # list of keys from 0 to (norders - 1)
-chunk_keys = np.arange(config["nchunks"])
+chunk_keys = np.arange(n_chunks)
 
 # Load data and apply masks
+chunk_data = []
+for chunk in chunks:
+    order, wl0, wl1 = chunk
+    chunkSpec = Chunk.open(order, wl0, wl1)
+    chunkSpec.apply_mask()
+    chunk_data.append(chunkSpec)
 
 # Set up the logger
 logging.basicConfig(format="%(asctime)s - %(levelname)s - %(name)s -  %(message)s", filename="{}log.log".format(
     Starfish.routdir), level=logging.DEBUG, filemode="w", datefmt='%m/%d/%Y %I:%M:%S %p')
 
+# Create a partial function which maps a vector of floats to parameters
+convert_vector_p = partial(utils.convert_vector, model=config["model"], fix_params=config["fix_params"], **pars)
 
 def info(title):
     '''
@@ -79,7 +92,7 @@ def info(title):
     print('process id:', os.getpid())
 
 
-class Chunk:
+class Worker:
     def __init__(self, debug=False):
         '''
         This object contains all of the variables necessary for the partial
@@ -94,12 +107,8 @@ class Chunk:
 
         # The list of possible function calls we can make.
         self.func_dict = {"INIT": self.initialize,
-                          "DECIDE": self.decide_Theta,
-                          "INST": self.instantiate,
-                          "LNPROB": self.lnprob_Theta,
-                          "GET_LNPROB": self.get_lnprob,
-                          "FINISH": self.finish,
-                          "SAVE": self.save,
+                          "LNPROB": self.lnprob,
+                          "FINISH": self.finish
                           }
 
         self.debug = debug
@@ -116,15 +125,16 @@ class Chunk:
         self.key = key
 
         # Load the proper chunk
-        data = Data[self.key]
+        data = chunk_data[self.key]
 
         self.wl = data.wl
         self.fl = data.fl
         self.sigma = data.sigma
         self.date = data.date
-        self.mask = data.mask
 
-        #TODO Apply mask
+        # Note that mask is already applied in loading step. This is to transform velocity shifts
+        # Evaluated off of self.date1D
+        self.mask = data.mask
 
         self.logger = logging.getLogger("{} {}".format(self.__class__.__name__, self.order))
         if self.debug:
@@ -135,138 +145,78 @@ class Chunk:
         self.logger.info("Initializing model on Spectrum {}, order {}.".format(self.spectrum_id, self.order_key))
 
         # Possibly set up temporary holders for V11 matrix.
-        # self.V11 =
+        # self.N is the length of the masked, flattened wl vector.
+        self.V11 = np.empty((self.N, self.N), dtype=np.float64)
 
-        self.lnprior = 0.0 # Modified and set by NuisanceSampler.lnprob
+        # Create an orbit
+        self.orb = orbit.models[config["model"]](**pars, obs_dates=self.date1D)
 
-        # New outdir based upon id
-        self.noutdir = routdir + "{}/".format(self.key)
+        # Choose which lnprob we will be using based off of the model type
+        lnprobs = {"SB1":self.lnprob_SB1, "SB2":self.lnprob_SB2, "ST3":self.lnprob_ST3}
+        self.lnprob = lnprobs[config["model"]]
 
-    def get_lnprob(self, *args):
-        '''
-        Return the *current* value of lnprob.
-        Intended to be called from the master process to
-        query the child processes for their current value of lnprob.
-        '''
-        return self.lnprob
-
-    def lnprob_Theta(self, p):
+    def lnprob_SB1(self, p):
         '''
         Update the model to the top level orbital (Theta) parameters and then evaluate the lnprob.
         Intended to be called from the master process via the command "LNPROB".
         '''
-        try:
-            self.update_Theta(p)
-            lnp = self.evaluate() # Also sets self.lnprob to new value
-            return lnp
-        except C.ChunkError:
-            self.logger.debug("ChunkError in Theta parameters for chunk {}, sending back -np.inf {}".format(self.key, p))
-            return -np.inf
-
-    def evaluate(self):
-        '''
-        Return the lnprob using the current version of the V11 matrix.
-        '''
-
-        self.lnprob_last = self.lnprob
-
-        # TODO change to appropriate model
-        # fill out covariance matrix
-        self.lnprob = covariance.lnlike_f(V11, wls_A.flatten(), fl, sigma, amp_f, l_f)
-
-
-    def update_Theta(self, p):
-        '''
-        Update the model to the current Theta parameters.
-        :param p: parameters to update model to
-        :type p: model.ThetaParam
-        '''
 
         # Designed to be subclassed based upon what model we want to use.
-        self.logger.debug("Updating Theta parameters to {}".format(p))
+        self.logger.debug("Updating orbital parameters to {}".format(p))
+
+        # unroll p
+        K, e, omega, P, T0, gamma, amp_f, l_f = convert_vector_p(p)
 
         # Update the orbit
-        orb.K = K
-        orb.e = e
-        orb.omega = omega
-        orb.P = P
-        orb.T0 = T0
-        orb.gamma = gamma
+        self.orb.K = K
+        self.orb.e = e
+        self.orb.omega = omega
+        self.orb.P = P
+        self.orb.T0 = T0
+        self.orb.gamma = gamma
 
         # predict velocities for each epoch
-        vAs = orb.get_component_velocities()
+        vAs = self.orb.get_component_velocities()
 
         # shift wavelengths according to these velocities to rest-frame of A component
-        wls_A = redshift(wls, -vAs[:,np.newaxis])
+        wls_A = redshift(self.chunk.wl, -vAs[:,np.newaxis][self.chunk.mask])
 
-        # Helps keep memory usage low, seems like the numpy routine is slow
-        # to clear allocated memory for each iteration.
+        # fill out covariance matrix
+        lnp = covariance.lnlike_f(self.V11, wls_A.flatten(), self.fl, self.sigma, amp_f, l_f)
+
         gc.collect()
 
-    def revert_Theta(self):
-        '''
-        Revert the status of the model from a rejected Theta proposal.
-        '''
+        return lnp
 
-        self.logger.debug("Reverting Theta parameters")
-        self.lnprob = self.lnprob_last
-        # self.V11 = self.V11_last
+    def lnprob_SB2(self, p):
+        # unroll p
+        q, K, e, omega, P, T0, gamma, amp_f, l_f, amp_g, l_g = convert_vector_p(p)
 
+        # Update the orbit
+        self.orb.q = q
+        self.orb.K = K
+        self.orb.e = e
+        self.orb.omega = omega
+        self.orb.P = P
+        self.orb.T0 = T0
+        self.orb.gamma = gamma
 
-    def decide_Theta(self, yes):
-        '''
-        Interpret the decision from the master process to either accept the parameters and move on OR reject the parameters and revert the Theta model.
-        :param yes: if True, accept stellar parameters.
-        :type yes: boolean
-        '''
-        if yes:
-            # accept and move on
-            self.logger.debug("Deciding to accept Theta parameters")
-        else:
-            # revert and move on
-            self.logger.debug("Deciding to revert Theta parameters")
-            self.revert_Theta()
+        # predict velocities for each epoch
+        vAs, vBs = self.orb.get_component_velocities()
 
-        # Proceed with independent sampling for this chunk, if applicable.
-        self.independent_sample(1)
+        # shift wavelengths according to these velocities to rest-frame of A component
+        wls_A = redshift(self.chunk.wl, -vAs[:,np.newaxis][self.chunk.mask])
+        wls_B = redshift(self.chunk.wl, -vBs[:,np.newaxis][self.chunk.mask])
 
-    def update_Phi(self, p):
-        '''
-        Update the Phi parameters (chunk-level parameters) and data covariance matrix.
-        :param params: large dictionary containing cheb, cov, and regions
-        '''
+        # fill out covariance matrix
+        lnp = covariance.lnlike_f_g(self.V11, wls_A.flatten(), wls_B.flatten(), self.chunk.fl, self.chunk.sigma, amp_f, l_f, amp_g, l_g)
 
+        gc.collect()
+
+        return lnp
+
+    def lnprob_ST3(self, p):
         raise NotImplementedError
-
-    def revert_Phi(self, *args):
-        '''
-        Revert all products from the nuisance parameters, including the data
-        covariance matrix.
-        '''
-
-        self.logger.debug("Reverting Phi parameters")
-        self.lnprob = self.lnprob_last
-        # self.V11 = self.V11_last
-
-
-    def independent_sample(self, niter):
-        '''
-        Do the independent sampling specific to this echelle order, using the
-        attached self.sampler (NuisanceSampler).
-        :param niter: number of iterations to complete before returning to master process.
-        '''
-
-        self.logger.debug("Beginning independent sampling on Phi parameters")
-
-        if self.lnprob:
-            # If we have a current value, pass it to the sampler
-            self.p0, self.lnprob, state = self.sampler.run_mcmc(pos0=self.p0, N=niter, lnprob0=self.lnprob)
-        else:
-            # Otherwise, start from the beginning
-            self.p0, self.lnprob, state = self.sampler.run_mcmc(pos0=self.p0, N=niter)
-
-        self.logger.debug("Finished independent sampling on Phi parameters")
-        # Don't return anything to the master process.
 
     def finish(self, *args):
         '''
@@ -315,7 +265,7 @@ class Chunk:
             self.conn.send(response)
         return True
 
-class SampleFlat(Chunk):
+class FlatWorker(Worker):
     '''
     Sample the theta parameters, while parallelizing the chunks.
     '''
@@ -328,131 +278,6 @@ class SampleFlat(Chunk):
         super().finish(*args)
         self.sampler.write(self.noutdir)
 
-
-# class SampleThetaCheb(Order):
-#     def initialize(self, key):
-#         super().initialize(key)
-#
-#         # for now, just use white noise
-#         self.data_mat = self.sigma_mat.copy()
-#         self.data_mat_last = self.data_mat.copy()
-#
-#         #Set up p0 and the independent sampler
-#         fname = Starfish.specfmt.format(self.spectrum_id, self.order) + "phi.json"
-#         phi = PhiParam.load(fname)
-#         self.p0 = phi.cheb
-#         cov = np.diag(Starfish.config["cheb_jump"]**2 * np.ones(len(self.p0)))
-#
-#         def lnfunc(p):
-#             # turn this into pars
-#             self.update_Phi(p)
-#             lnp = self.evaluate()
-#             self.logger.debug("Evaluated Phi parameters: {} {}".format(p, lnp))
-#             return lnp
-#
-#         def rejectfn():
-#             self.logger.debug("Calling Phi revertfn.")
-#             self.revert_Phi()
-#
-#         self.sampler = StateSampler(lnfunc, self.p0, cov, query_lnprob=self.get_lnprob, rejectfn=rejectfn, debug=True)
-#
-#     def update_Phi(self, p):
-#         '''
-#         Update the Chebyshev coefficients only.
-#         '''
-#         self.chebyshevSpectrum.update(p)
-#
-#     def finish(self, *args):
-#         super().finish(*args)
-#         fname = Starfish.routdir + Starfish.specfmt.format(self.spectrum_id, self.order) + "/mc.hdf5"
-#         self.sampler.write(fname=fname)
-
-# class SampleThetaPhi(Order):
-#
-#     def initialize(self, key):
-#         # Run through the standard initialization
-#         super().initialize(key)
-#
-#         # for now, start with white noise
-#         self.data_mat = self.sigma_mat.copy()
-#         self.data_mat_last = self.data_mat.copy()
-#
-#         #Set up p0 and the independent sampler
-#         fname = Starfish.specfmt.format(self.spectrum_id, self.order) + "phi.json"
-#         phi = PhiParam.load(fname)
-#
-#         # Set the regions to None, since we don't want to include them even if they
-#         # are there
-#         phi.regions = None
-#
-#         #Loading file that was previously output
-#         # Convert PhiParam object to an array
-#         self.p0 = phi.toarray()
-#
-#         jump = Starfish.config["Phi_jump"]
-#         cheb_len = (self.npoly - 1) if self.chebyshevSpectrum.fix_c0 else self.npoly
-#         cov_arr = np.concatenate((Starfish.config["cheb_jump"]**2 * np.ones((cheb_len,)), np.array([jump["sigAmp"], jump["logAmp"], jump["l"]])**2 ))
-#         cov = np.diag(cov_arr)
-#
-#         def lnfunc(p):
-#             # Convert p array into a PhiParam object
-#             ind = self.npoly
-#             if self.chebyshevSpectrum.fix_c0:
-#                 ind -= 1
-#
-#             cheb = p[0:ind]
-#             sigAmp = p[ind]
-#             ind+=1
-#             logAmp = p[ind]
-#             ind+=1
-#             l = p[ind]
-#
-#             par = PhiParam(self.spectrum_id, self.order, self.chebyshevSpectrum.fix_c0, cheb, sigAmp, logAmp, l)
-#
-#             self.update_Phi(par)
-#
-#             # sigAmp must be positive (this is effectively a prior)
-#             # See https://github.com/iancze/Starfish/issues/26
-#             if not (0.0 < sigAmp):
-#                 self.lnprob_last = self.lnprob
-#                 lnp = -np.inf
-#                 self.logger.debug("sigAmp was negative, returning -np.inf")
-#                 self.lnprob = lnp # Same behavior as self.evaluate()
-#             else:
-#                 lnp = self.evaluate()
-#                 self.logger.debug("Evaluated Phi parameters: {} {}".format(par, lnp))
-#
-#             return lnp
-#
-#         def rejectfn():
-#             self.logger.debug("Calling Phi revertfn.")
-#             self.revert_Phi()
-#
-#         self.sampler = StateSampler(lnfunc, self.p0, cov, query_lnprob=self.get_lnprob, rejectfn=rejectfn, debug=True)
-#
-#     def update_Phi(self, p):
-#         self.logger.debug("Updating nuisance parameters to {}".format(p))
-#
-#         # Read off the Chebyshev parameters and update
-#         self.chebyshevSpectrum.update(p.cheb)
-#
-#         # Check to make sure the global covariance parameters make sense
-#         #if p.sigAmp < 0.1:
-#         #   raise C.ModelError("sigAmp shouldn't be lower than 0.1, something is wrong.")
-#
-#         max_r = 6.0 * p.l # [km/s]
-#
-#         # Create a partial function which returns the proper element.
-#         k_func = make_k_func(p)
-#
-#         # Store the previous data matrix in case we want to revert later
-#         self.data_mat_last = self.data_mat
-#         self.data_mat = get_dense_C(self.wl, k_func=k_func, max_r=max_r) + p.sigAmp*self.sigma_mat
-#
-#     def finish(self, *args):
-#         super().finish(*args)
-#         fname = Starfish.routdir + Starfish.specfmt.format(self.spectrum_id, self.order) + "/mc.hdf5"
-#         self.sampler.write(fname=fname)
 
 # We create one Order() in the main process. When the process forks, each
 # subprocess now has its own independent OrderModel instance.
@@ -522,12 +347,16 @@ def test():
 # thus, to really close a pipe, you need to close it in every subprocess.
 
 # Create the main sampling loop, which will sample the theta parameters across all chunks
-model = SampleFlat(debug=True)
+model = FlatWorker(debug=True)
 
 # Now that the different processes have been forked, initialize them
 pconns, cconns, ps = parallel.initialize(model)
 
+# Optionally load a user-defined prior
+
 def lnprob(p):
+
+    # TODO Optionally apply a user-defined prior here
 
     # Assume p is [K, e, omega, etc...]
 
