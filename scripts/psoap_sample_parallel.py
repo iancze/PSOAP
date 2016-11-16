@@ -22,7 +22,7 @@ import os
 import numpy as np
 from astropy.io import ascii
 
-from psoap.samplers import StateSampler
+# from psoap.samplers import StateSampler
 import psoap.constants as C
 from psoap.data import Chunk, redshift
 from psoap import utils
