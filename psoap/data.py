@@ -89,7 +89,7 @@ class Chunk:
         self.N = len(self.wl)
 
     @classmethod
-    def open(cls, order, wl0, wl1):
+    def open(cls, order, wl0, wl1, limit=40):
         '''
         Load a spectrum from a directory link pointing to HDF5 output.
         :param fname: HDF5 file containing files on disk.
@@ -99,12 +99,13 @@ class Chunk:
         fname = C.chunk_fmt.format(order, wl0, wl1) + ".hdf5"
         import h5py
         with h5py.File(fname, "r") as hdf5:
-            wl = hdf5["wl"][:]
-            fl = hdf5["fl"][:]
-            sigma = hdf5["sigma"][:]
-            date = hdf5["date"][:]
-            mask = np.array(hdf5["mask"][:], dtype="bool") # Make sure it is explicitly boolean mask
+            wl = hdf5["wl"][:limit]
+            fl = hdf5["fl"][:limit]
+            sigma = hdf5["sigma"][:limit]
+            date = hdf5["date"][:limit]
+            mask = np.array(hdf5["mask"][:limit], dtype="bool") # Make sure it is explicitly boolean mask
 
+            print("Limiting to {} epochs".format(len(wl)))
         #Although the actual fluxes and errors may be reasonably stored as float32, we need to do
         # all of the calculations in float64, and so we convert here.
         #The wl must be stored as float64, because of precise velocity issues.

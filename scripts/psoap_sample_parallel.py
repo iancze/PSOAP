@@ -73,7 +73,7 @@ chunk_keys = np.arange(n_chunks)
 chunk_data = []
 for chunk in chunks:
     order, wl0, wl1 = chunk
-    chunkSpec = Chunk.open(order, wl0, wl1)
+    chunkSpec = Chunk.open(order, wl0, wl1, limit=config["epoch_limit"])
     chunkSpec.apply_mask()
     chunk_data.append(chunkSpec)
 
@@ -135,7 +135,7 @@ class Worker:
 
         self.wl = data.wl
         self.fl = data.fl
-        self.sigma = data.sigma
+        self.sigma = data.sigma * config["soften"]
         self.date = data.date
 
         # Note that mask is already applied in loading step. This is to transform velocity shifts
@@ -218,6 +218,9 @@ class Worker:
         # fill out covariance matrix
         lnp = covariance.lnlike_f_g(self.V11, wls_A.flatten(), wls_B.flatten(), self.fl, self.sigma, amp_f, l_f, amp_g, l_g)
 
+        if lnp == -np.inf:
+            self.logger.debug("Worker {} evaulated -np.inf".format(self.key))
+
         gc.collect()
 
         return lnp
@@ -251,6 +254,9 @@ class Worker:
 
         # fill out covariance matrix
         lnp = covariance.lnlike_f_g_h(self.V11, wls_A.flatten(), wls_B.flatten(), wls_C.flatten(), self.fl, self.sigma, amp_f, l_f, amp_g, l_g, amp_h, l_h)
+
+        if lnp == -np.inf:
+            self.logger.debug("Worker {} evaulated -np.inf".format(self.key))
 
         gc.collect()
 
@@ -405,8 +411,9 @@ def prior_SB2(p):
 def prior_ST3(p):
     q_in, K_in, e_in, omega_in, P_in, T0_in, q_out, K_out, e_out, omega_out, P_out, T0_out, gamma, amp_f, l_f, amp_g, l_g, amp_h, l_h = convert_vector_p(p)
 
-    if q_in < 0.0 or q_in > 1.0 or K_in < 0.0 or e_in < 0.0 or e_in > 1.0 or P_in < 0.0 or omega_in < -180 or omega_in > 520 or q_out < 0.0 or q_out > 1.0 or K_out < 0.0 or e_out < 0.0 or e_out > 1.0 or P_out < 0.0 or omega_out < -180 or omega_out > 520 or amp_f < 0.0 or l_f < 0.0 or amp_h < 0.0 or l_h < 0.0:
+    if q_in < 0.0 or q_in > 1.0 or K_in < 0.0 or e_in < 0.0 or e_in > 1.0 or P_in < 0.0 or omega_in < -180 or omega_in > 520 or q_out < 0.0 or q_out > 1.0 or K_out < 0.0 or e_out < 0.0 or e_out > 1.0 or P_out < 0.0 or omega_out < -180 or omega_out > 520 or amp_f < 0.0 or l_f < 0.0 or amp_g < 0.0 or l_g < 0.0 or amp_h < 0.0 or l_h < 0.0:
         return -np.inf
+
     else:
         return 0.0
 

@@ -20,6 +20,9 @@ from psoap import utils
 flatchain = np.load("flatchain.npy")
 flatchain = flatchain[args.burn:]
 
+print("Last sample is ")
+print(flatchain[-1])
+
 # Load the lnprobabilities and truncate for burn in
 lnprobs = np.load("lnprob.npy")
 lnprobs = lnprobs[args.burn:]
