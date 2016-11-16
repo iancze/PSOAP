@@ -1,0 +1,50 @@
+# Test config file
+# This is copied to your local directory for each type of MCMC run.
+
+# This is the original HDF5 file from which we will draw the data.
+data_file : GWOri.hdf5
+
+# The file that contains the choices of chunks
+chunk_file : chunks.dat
+
+# The file that contains the decisions for masking
+mask_file : masks.dat
+
+epoch_limit : 20
+soften : 1.0
+
+
+# choice of SB1, SB2, or SB3
+model: SB1
+
+# Each model has a subset of parameters that are possible to sample for
+
+# parameters
+# starting position chosen from these parameters
+parameters:
+  K: 1.0 # semi-amplitude of primary [km/s]
+  e: 0.0 # eccentricity
+  omega : 0.0 # argument of periastron [deg]
+  P : 10.0 # period [days]
+  T0 : 0.0 # epoch [Julian Date]
+  gamma : 0.0 # systemic velocity [km/s]
+  amp_f : 0.5 # amplitude of primary GP [flux]
+  l_f : 5.0 # length scale of primary GP [km/s]
+
+jumps :
+  K: 0.2 # semi-amplitude of primary [km/s]
+  e: 0.02 # eccentricity
+  omega : 0.01 # argument of periastron [deg]
+  P : 0.01 # period [days]
+  T0 : 0.01 # epoch [Julian Date]
+  gamma : 0.01 # systemic velocity [km/s]
+  amp_f : 0.05 # amplitude of primary GP [flux]
+  l_f : 0.5 # length scale of primary GP [km/s]
+
+fix_params: ["gamma"]
+
+samples : 100
+
+opt_jump : opt_jump.npy
+
+outdir : output
