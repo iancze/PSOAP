@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+import sys
+print("Using Python Version", sys.version)
+
 import argparse
 
 parser = argparse.ArgumentParser(description="Initialize a new directory to do inference.")
