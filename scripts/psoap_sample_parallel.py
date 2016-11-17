@@ -455,6 +455,26 @@ dim = len(utils.registered_params[config["model"]]) - len(config["fix_params"])
 # Read in starting parameters
 p0 = utils.convert_dict(config["model"], config["fix_params"], **pars)
 
+# To check feasibility, evaluate the starting position. If this evaluates to -np.inf, then just
+# exit, since we might be wasting our time evaluating the rest.
+lnp0 = lnprob(p0)
+if lnp0 == -np.inf:
+    print("Starting position for Markov Chain evaluates to -np.inf")
+    # Kill all of the orders
+    for pconn in pconns.values():
+        pconn.send(("FINISH", None))
+        pconn.send(("DIE", None))
+
+    # Join on everything and terminate
+    for p in ps.values():
+        p.join()
+        p.terminate()
+
+    raise RuntimeError
+
+else:
+    print("Starting position good. lnp: {}".format(lnp0))
+
 try:
     cov = np.load(config["opt_jump"])
     print("using optimal jumps")
