@@ -257,7 +257,7 @@ def predict_f_g_sum(wl_f, wl_g, fl_fg, sigma_fg, wl_f_predict, wl_g_predict, mu_
     return mu, Sigma
 
 
-def predict_f_g_h(wl_f, wl_g, wl_h, wl_fgh, fl_fgh, sigma_fgh, mu_g, mu_h, amp_f, l_f, amp_g, l_g, amp_h, l_h, mu_f=0.5):
+def predict_f_g_h(wl_f, wl_g, wl_h, fl_fgh, sigma_fgh, mu_f, mu_g, mu_h, amp_f, l_f, amp_g, l_g, amp_h, l_h):
     '''
     Given that f + g + h is the flux that we're modeling, jointly predict the components.
     '''
@@ -274,17 +274,22 @@ def predict_f_g_h(wl_f, wl_g, wl_h, wl_fgh, fl_fgh, sigma_fgh, mu_g, mu_h, amp_f
     # Cat these into a single vector
     mu_cat = np.hstack((mu_f, mu_g, mu_h))
 
-    # for these blocks, set sigma nuggets to 0.0. Add in later.
-    V11_f = get_V11(wl_f.flatten(), 0.0, amp_f, l_f)
-    V11_g = get_V11(wl_g.flatten(), 0.0, amp_g, l_g)
-    V11_h = get_V11(wl_h.flatten(), 0.0, amp_h, l_h)
-    V11_fgh = V11_f + V11_g + V11_h + sigma_fgh**2 * np.eye(len(V11_f))
-    B = V11_fgh
+    V11_f = np.empty((n_pix, n_pix), dtype=np.float)
+    V11_g = np.empty((n_pix, n_pix), dtype=np.float)
+    V11_h = np.empty((n_pix, n_pix), dtype=np.float)
 
+    matrix_functions.fill_V11_f(V11_f, wl_f, amp_f, l_f)
+    matrix_functions.fill_V11_f(V11_g, wl_g, amp_g, l_g)
+    matrix_functions.fill_V11_f(V11_h, wl_h, amp_h, l_h)
+
+    B = V11_f + V11_g + V11_h
+    B[np.diag_indices_from(B)] += sigma_fgh**2
+
+    factor, flag = cho_factor(B)
 
     zeros = np.zeros((n_pix, n_pix))
     A = np.vstack((np.hstack([V11_f, zeros, zeros]), np.hstack([zeros, V11_g, zeros]), np.hstack([zeros, zeros, V11_h])))
-    A = A + 1e-5 * np.eye(len(A)) # Add a small nugget term
+    # A = A + 1e-5 * np.eye(len(A)) # Add a small nugget term
     C = np.vstack((V11_f, V11_g, V11_h))
 
     factor, flag = cho_factor(B)
@@ -300,23 +305,38 @@ def predict_f_g_h_sum(wl_f, wl_g, wl_h, fl_fgh, sigma_fgh, wl_f_predict, wl_g_pr
     '''
     # Assert that wl_f and wl_g are the same length
     assert len(wl_f) == len(wl_g), "Input wavelengths must be the same length."
-    assert len(wl_f) == len(wl_h), "Input wavelengths must be the same length."
-    n_pix = len(wl_f)
 
-    V11_f = get_V11(wl_f_predict, 0.0, amp_f, l_f)
-    V11_g = get_V11(wl_g_predict, 0.0, amp_g, l_g)
-    V11_h = get_V11(wl_h_predict, 0.0, amp_h, l_h)
-    V11 = V11_f + V11_g + V11_h + 1e-5 * np.eye(len(V11_f))
+    M = len(wl_f_predict)
+    N = len(wl_f)
 
-    V12_f = get_V12(wl_f_predict, wl_f, amp_f, l_f)
-    V12_g = get_V12(wl_g_predict, wl_g, amp_g, l_g)
-    V12_h = get_V12(wl_h_predict, wl_h, amp_h, l_h)
+    V11_f = np.empty((M, M), dtype=np.float)
+    V11_g = np.empty((M, M), dtype=np.float)
+    V11_h = np.empty((M, M), dtype=np.float)
+
+    matrix_functions.fill_V11_f(V11_f, wl_f_predict, amp_f, l_f)
+    matrix_functions.fill_V11_f(V11_g, wl_g_predict, amp_g, l_g)
+    matrix_functions.fill_V11_f(V11_h, wl_h_predict, amp_h, l_h)
+    V11 = V11_f + V11_g + V11_h
+    # V11[np.diag_indices_from(V11)] += 1e-5 # small nugget term
+
+    V12_f = np.empty((M, N), dtype=np.float64)
+    V12_g = np.empty((M, N), dtype=np.float64)
+    V12_h = np.empty((M, N), dtype=np.float64)
+    matrix_functions.fill_V12_f(V12_f, wl_f_predict, wl_f, amp_f, l_f)
+    matrix_functions.fill_V12_f(V12_g, wl_g_predict, wl_g, amp_g, l_g)
+    matrix_functions.fill_V12_f(V12_h, wl_h_predict, wl_h, amp_h, l_h)
     V12 = V12_f + V12_g + V12_h
 
-    V22_f = get_V22(wl_f, amp_f, l_f)
-    V22_g = get_V22(wl_g, amp_g, l_g)
-    V22_h = get_V22(wl_h, amp_h, l_h)
-    V22 = V22_f + V22_g + V22_h + sigma_fgh**2 * np.eye(len(V22_f))
+    V22_f = np.empty((N,N), dtype=np.float)
+    V22_g = np.empty((N,N), dtype=np.float)
+    V22_h = np.empty((N,N), dtype=np.float)
+
+    # It's a square matrix, so we can just reuse fil_V11_f
+    matrix_functions.fill_V11_f(V22_f, wl_f, amp_f, l_f)
+    matrix_functions.fill_V11_f(V22_g, wl_g, amp_g, l_g)
+    matrix_functions.fill_V11_f(V22_h, wl_h, amp_h, l_h)
+    V22 = V22_f + V22_g + V22_h
+    V22[np.diag_indices_from(V22)] += sigma_fgh**2
 
     factor, flag = cho_factor(V22)
 

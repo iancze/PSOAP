@@ -21,11 +21,20 @@ except FileNotFoundError as e:
     print("You need to copy a config.yaml file to this directory, and then edit the values to your particular case.")
     raise
 
+# Load the list of chunks
+chunks = ascii.read(config["chunk_file"])
+print("Sampling the following chunks of data, one chunk per core.")
+print(chunks)
+
+# For now, only use the first chunk.
+order, wl0, wl1 = chunks[0]
+chunk = Chunk.open(order, wl0, wl1, limit=config["epoch_limit"])
+
 # Load the data
-wls = np.load("fake_SB2_wls.npy")
-fl = np.load("fake_SB2_fls.npy")
-sigma = np.load("fake_SB2_sigmas.npy")
-dates = np.load("fake_SB2_dates.npy")
+wls = chunk.wl
+fl = chunk.fl
+sigma = chunk.sigma
+dates = chunk.date1D
 
 # Use the parameters specified in the yaml file to create the spectra
 pars = config["parameters"]
@@ -67,12 +76,6 @@ mu_g.shape = (n_epochs, -1)
 mu_sum.shape = (n_epochs, -1)
 
 
-
-# plt.imshow(Sigma, interpolation="none")
-# plt.show()
-
-# import sys
-# sys.exit()
 
 # Make some multivariate draws
 n_draws = 30

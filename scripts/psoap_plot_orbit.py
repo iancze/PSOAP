@@ -15,6 +15,8 @@ import matplotlib.pyplot as plt
 from psoap import constants as C
 from psoap import orbit
 from psoap import utils
+from psoap.data import Chunk
+from astropy.io import ascii
 
 import yaml
 from functools import partial
@@ -27,9 +29,14 @@ except FileNotFoundError as e:
     print("You need to copy a config.yaml file to this directory, and then edit the values to your particular case.")
     raise
 
+# Load the list of chunks
+chunks = ascii.read("../../" + config["chunk_file"])
 
-# Load the data
-dates = np.load("fake_SB2_dates.npy")
+# Load data and apply masks
+order, wl0, wl1 = chunks[0]
+chunkSpec = Chunk.open(order, wl0, wl1, limit=config["epoch_limit"], prefix="../../")
+
+dates = chunkSpec.date1D
 
 dates_fine = np.linspace(np.min(dates), np.max(dates), num=100)
 
@@ -47,7 +54,7 @@ def get_orbit_SB1(p):
     K, e, omega, P, T0, gamma, amp_f, l_f = convert_vector_p(p)
 
     if K < 0.0 or e < 0.0 or e > 1.0 or P < 0.0 or omega < -180 or omega > 520 or amp_f < 0.0 or l_f < 0.0:
-        return -np.inf
+        raise RuntimeError
 
     # Update the orbit
     orb.K = K
@@ -68,7 +75,7 @@ def get_orbit_SB2(p):
     q, K, e, omega, P, T0, gamma, amp_f, l_f, amp_g, l_g = convert_vector_p(p)
 
     if q < 0.0 or q > 1.0 or K < 0.0 or e < 0.0 or e > 1.0 or P < 0.0 or omega < -180 or omega > 520 or amp_f < 0.0 or l_f < 0.0:
-        return -np.inf
+        raise RuntimeError
 
     # Update the orbit
     orb.q = q
@@ -86,7 +93,28 @@ def get_orbit_SB2(p):
     return (vAs, vAs_fine, vBs, vBs_fine)
 
 def get_orbit_ST3(p):
-    raise NotImplementedError
+    q_in, K_in, e_in, omega_in, P_in, T0_in, q_out, K_out, e_out, omega_out, P_out, T0_out, gamma, amp_f, l_f, amp_g, l_g, amp_h, l_h = convert_vector_p(p)
+
+    # Update the orbit
+    orb.q_in = q_in
+    orb.K_in = K_in
+    orb.e_in = e_in
+    orb.omega_in = omega_in
+    orb.P_in = P_in
+    orb.T0_in = T0_in
+    orb.q_out = q_out
+    orb.K_out = K_out
+    orb.e_out = e_out
+    orb.omega_out = omega_out
+    orb.P_out = P_out
+    orb.T0_out = T0_out
+    orb.gamma = gamma
+
+    # predict velocities for each epoch
+    vAs, vBs, vCs = orb.get_component_velocities()
+    vAs_fine, vBs_fine, vCs_fine = orb.get_component_velocities(dates_fine)
+
+    return (vAs, vAs_fine, vBs, vBs_fine, vCs, vCs_fine)
 
 
 # Read config, data, and samples. Create a set of finely spaced dates, and for each (independent) sample, draw points and plot an orbit.
@@ -109,10 +137,18 @@ elif config["model"] == "SB2":
         ax.plot(dates_fine, vBs_fine, color="g", lw=0.5, alpha=0.3)
         ax.plot(dates, vAs, ".", color="b")
         ax.plot(dates, vBs, ".", color="g")
-
+elif config["model"] == "ST3":
+    for p in flatchain:
+        vAs, vAs_fine, vBs, vBs_fine, vCs, vCs_fine = get_orbit_ST3(p)
+        ax.plot(dates_fine, vAs_fine, color="b", lw=0.5, alpha=0.3)
+        ax.plot(dates_fine, vBs_fine, color="g", lw=0.5, alpha=0.3)
+        ax.plot(dates_fine, vCs_fine, color="r", lw=0.5, alpha=0.3)
+        ax.plot(dates, vAs, ".", color="b")
+        ax.plot(dates, vBs, ".", color="g")
+        ax.plot(dates, vCs, ".", color="r")
 else:
     print("model not implemented yet")
 
 ax.set_xlabel("date [day]")
 ax.set_ylabel(r"$v$ [km/s]")
-fig.savefig("orbits.png")
+fig.savefig("orbits.png", dpi=300)
