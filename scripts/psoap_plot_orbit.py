@@ -11,6 +11,7 @@ args = parser.parse_args()
 
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 from psoap import constants as C
 from psoap import orbit
@@ -123,14 +124,18 @@ flatchain = np.load("flatchain.npy")[args.burn::args.thin]
 indexes = np.random.choice(np.arange(len(flatchain)), size=args.draws)
 flatchain = flatchain[indexes]
 
-fig, ax = plt.subplots(figsize=(8,5))
-ax.axhline(pars["gamma"], color="0.4", ls="-.")
 if config["model"] == "SB1":
+    fig, ax = plt.subplots(figsize=(8,5))
+    ax.axhline(pars["gamma"], color="0.4", ls="-.")
+
     for p in flatchain:
         vAs, vAs_fine = get_orbit_SB1(p)
         ax.plot(dates_fine, vAs_fine, color="0.4", lw=0.5)
         ax.plot(dates, vAs, "o", color="0.4")
 elif config["model"] == "SB2":
+    fig, ax = plt.subplots(figsize=(8,5))
+    ax.axhline(pars["gamma"], color="0.4", ls="-.")
+
     for p in flatchain:
         vAs, vAs_fine, vBs, vBs_fine = get_orbit_SB2(p)
         ax.plot(dates_fine, vAs_fine, color="b", lw=0.5, alpha=0.3)
@@ -138,17 +143,48 @@ elif config["model"] == "SB2":
         ax.plot(dates, vAs, ".", color="b")
         ax.plot(dates, vBs, ".", color="g")
 elif config["model"] == "ST3":
+    fig, ax = plt.subplots(nrows=4, figsize=(8,5), sharex=True)
+    ax[0].axhline(pars["gamma"], color="0.4", ls="-.")
+
+
+    # If we have the actual true velocities, (fake data), plot them
+    if os.path.exists("vAs_relative.npy"):
+        vAs_relative = np.load("vAs_relative.npy")
+        vBs_relative = np.load("vBs_relative.npy")
+        vCs_relative = np.load("vCs_relative.npy")
+
+        ax[1].plot(dates, vAs_relative, "ko")
+        ax[2].plot(dates, vBs_relative, "ko")
+        ax[3].plot(dates, vCs_relative, "ko")
+
+
+    # find the index that corresponds to the minimum date
+    ind0 = np.argmin(dates)
+
     for p in flatchain:
         vAs, vAs_fine, vBs, vBs_fine, vCs, vCs_fine = get_orbit_ST3(p)
-        ax.plot(dates_fine, vAs_fine, color="b", lw=0.5, alpha=0.3)
-        ax.plot(dates_fine, vBs_fine, color="g", lw=0.5, alpha=0.3)
-        ax.plot(dates_fine, vCs_fine, color="r", lw=0.5, alpha=0.3)
-        ax.plot(dates, vAs, ".", color="b")
-        ax.plot(dates, vBs, ".", color="g")
-        ax.plot(dates, vCs, ".", color="r")
+
+        ax[0].plot(dates_fine, vAs_fine, color="b", lw=0.5, alpha=0.3)
+        ax[0].plot(dates_fine, vBs_fine, color="g", lw=0.5, alpha=0.3)
+        ax[0].plot(dates_fine, vCs_fine, color="r", lw=0.5, alpha=0.3)
+        ax[0].plot(dates, vAs, ".", color="b")
+        ax[0].plot(dates, vBs, ".", color="g")
+        ax[0].plot(dates, vCs, ".", color="r")
+
+        ax[1].plot(dates, vAs - vAs[ind0], "b.")
+
+        ax[2].plot(dates, vBs - vBs[ind0], "g.")
+
+        ax[3].plot(dates, vCs - vCs[ind0], "r.")
+
+    ax[0].set_ylabel(r"$v$ [km/s]")
+    ax[1].set_ylabel(r"$v_A$ relative")
+    ax[2].set_ylabel(r"$v_B$ relative")
+    ax[3].set_ylabel(r"$v_C$ relative")
+    ax[-1].set_xlabel("date [day]")
+
+
 else:
     print("model not implemented yet")
 
-ax.set_xlabel("date [day]")
-ax.set_ylabel(r"$v$ [km/s]")
 fig.savefig("orbits.png", dpi=300)
