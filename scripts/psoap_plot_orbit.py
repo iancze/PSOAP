@@ -39,7 +39,7 @@ chunkSpec = Chunk.open(order, wl0, wl1, limit=config["epoch_limit"], prefix="../
 
 dates = chunkSpec.date1D
 
-dates_fine = np.linspace(np.min(dates), np.max(dates), num=100)
+dates_fine = np.linspace(np.min(dates), np.max(dates), num=300)
 
 pars = config["parameters"]
 
@@ -132,6 +132,10 @@ if config["model"] == "SB1":
         vAs, vAs_fine = get_orbit_SB1(p)
         ax.plot(dates_fine, vAs_fine, color="0.4", lw=0.5)
         ax.plot(dates, vAs, "o", color="0.4")
+
+    # Save the velocities from a random draw.
+    np.save("vA_model.npy", vAs)
+
 elif config["model"] == "SB2":
     fig, ax = plt.subplots(figsize=(8,5))
     ax.axhline(pars["gamma"], color="0.4", ls="-.")
@@ -142,6 +146,11 @@ elif config["model"] == "SB2":
         ax.plot(dates_fine, vBs_fine, color="g", lw=0.5, alpha=0.3)
         ax.plot(dates, vAs, ".", color="b")
         ax.plot(dates, vBs, ".", color="g")
+
+    # Save the velocities from a random draw.
+    np.save("vA_model.npy", vAs)
+    np.save("vB_model.npy", vBs)
+
 elif config["model"] == "ST3":
     fig, ax = plt.subplots(nrows=4, figsize=(8,5), sharex=True)
     ax[0].axhline(pars["gamma"], color="0.4", ls="-.")
@@ -182,6 +191,11 @@ elif config["model"] == "ST3":
     ax[2].set_ylabel(r"$v_B$ relative")
     ax[3].set_ylabel(r"$v_C$ relative")
     ax[-1].set_xlabel("date [day]")
+
+    # Save the velocities from a random draw.
+    np.save("vA_model.npy", vAs)
+    np.save("vB_model.npy", vBs)
+    np.save("vC_model.npy", vCs)
 
 
 else:

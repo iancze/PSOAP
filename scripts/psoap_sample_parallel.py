@@ -389,7 +389,7 @@ worker = Worker(debug=True)
 # Now that the different processes have been forked, initialize them
 pconns, cconns, ps = initialize(worker)
 
-# Optionally load a user-defined prior.
+
 def prior_SB1(p):
     K, e, omega, P, T0, gamma, amp_f, l_f = convert_vector_p(p)
 
@@ -418,10 +418,18 @@ def prior_ST3(p):
         return 0.0
 
 
-priors = {"SB1":prior_SB1, "SB2":prior_SB2, "ST3":prior_ST3}
-prior = priors[config["model"]]
+# Optionally load a user-defined prior.
+# Check if a file named "prior.py" exists in the local folder
+# If so, import it
+try:
+    from prior import prior
+    print("Loaded user defined prior.")
+except ImportError:
+    print("Using default prior.")
+    # Set the default priors.
+    priors = {"SB1":prior_SB1, "SB2":prior_SB2, "ST3":prior_ST3}
+    prior = priors[config["model"]]
 
-# Otherwise, use the default priors.
 
 def lnprob(p):
 

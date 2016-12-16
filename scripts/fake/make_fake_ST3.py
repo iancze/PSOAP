@@ -26,7 +26,7 @@ T0_outer = 3.0 # epoch
 gamma = 5.0 # km/s
 
 n_epochs = 20
-obs_dates = np.linspace(5, 30, num=n_epochs)
+obs_dates = np.linspace(5, 150, num=n_epochs)
 
 orb = orbit.ST3(q_inner, K_inner, e_inner, omega_inner, P_inner, T0_inner, q_outer, K_outer, e_outer, omega_outer, P_outer, T0_outer, gamma, obs_dates)
 
