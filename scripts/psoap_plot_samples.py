@@ -42,9 +42,6 @@ f.close()
 model = config["model"]
 labels = utils.get_labels(model, config["fix_params"])
 
-
-import matplotlib.pyplot as plt
-
 fig, ax = plt.subplots(nrows=(ndim + 1), ncols=1, figsize=(10, 1.5 * ndim))
 
 iterations = np.arange(niter)

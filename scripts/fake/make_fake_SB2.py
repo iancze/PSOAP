@@ -23,14 +23,17 @@ P = 10.0 # days
 T0 = 0.0 # epoch
 gamma = 5.0 # km/s
 
-n_epochs = 20
-obs_dates = np.linspace(5, 150, num=n_epochs)
+n_epochs = 10
+
+obs_dates = np.array([2.1, 4.9, 8.0, 9.9, 12.2, 16.0, 16.9, 19.1, 22.3, 26.1])
+# obs_dates = np.linspace(5, 150, num=n_epochs)
+
 
 orb = orbit.SB2(q, K, e, omega, P, T0, gamma, obs_dates)
 
 vAs, vBs = orb.get_component_velocities()
 
-dates_fine = np.linspace(0, 150, num=200)
+dates_fine = np.linspace(0, 30, num=200)
 vA_fine, vB_fine = orb.get_component_velocities(dates_fine)
 
 vAs_relative = vAs - vAs[0]
@@ -108,16 +111,24 @@ for i in range(n_epochs):
 ax[-1].set_xlabel(r"$\lambda [\AA]$")
 fig.savefig("SB2/dataset_noiseless_full.png", dpi=300)
 
-# let alpha be the percentage of the primary as the total flux.
-alpha = 0.7
 
 # Here is where we set up the number of chunks, and choose what region of overlaps we want.
 # New chunks [start, stop]
-chunk_wls = [[5240, 5250], [5255, 5265], [5270, 5280]]
+# chunk_wls = [[5240, 5250], [5255, 5265], [5270, 5280]]
+
+chunk_wls = [[5265, 5275]]
+
+# Measure this as S/N per resolution element. That means that there is a sqrt(2.5) effect.
+
+# let alpha be the percentage of the primary as the total flux.
+ratio = 0.5
+alpha = (1 / (ratio + 1))
+print("Ratio: {}, alpha: {}".format(ratio, alpha))
+# alpha = 0.90
 
 # Assume a S/N = 40, so N = 1.0 / 40
-S_N = 40
-noise_amp = 1.0 / S_N
+S_N = 60 # per resolution element
+noise_amp = 1.0 / (S_N/np.sqrt(2.5)) # per pixel
 
 # Truncate down to a smaller region to ensure overlap between all orders.
 for (wl0, wl1) in chunk_wls:
@@ -166,6 +177,7 @@ for (wl0, wl1) in chunk_wls:
         fls_comb[i] = fl_common
         fls_noise[i] = fl_common_noise
 
+
         fig, ax = plt.subplots(nrows=4, sharex=True)
         ax[0].plot(wl_common, alpha * fl_f_common, "b")
         ax[0].set_ylabel(r"$f$")
@@ -185,3 +197,11 @@ for (wl0, wl1) in chunk_wls:
     wl1 = np.max(wls_comb)
 
     chunkSpec.save(0, wl0, wl1, prefix="SB2/")
+
+    # 2D arrays before we have summed them or added noise.
+    print("STDEV primary", np.std(alpha * fls_f))
+    print("STDEV secondary", np.std((1 - alpha) * fls_g))
+
+    np.save("SB2/fls_f.npy", alpha * fls_f)
+    np.save("SB2/fls_g.npy", (1 - alpha) * fls_g)
+    np.save("SB2/fls_comb.npy", fls_comb)

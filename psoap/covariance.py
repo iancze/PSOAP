@@ -180,21 +180,26 @@ def predict_python(wl_known, fl_known, sigma_known, wl_predict, amp_f, l_f, mu_G
     return (mu, Sigma)
 
 
-def predict_f_g(wl_f, wl_g, fl_fg, sigma_fg, mu_f, amp_f, l_f, mu_g, amp_g, l_g):
+def predict_f_g(wl_f, wl_g, fl_fg, sigma_fg, wl_f_predict, wl_g_predict, mu_f, amp_f, l_f, mu_g, amp_g, l_g):
     '''
     Given that f + g is the flux that we're modeling, jointly predict the components.
     '''
     # Assert that wl_f and wl_g are the same length
-    assert len(wl_f) == len(wl_g), "Input wavelengths must be the same lengeth."
+    assert len(wl_f) == len(wl_g), "Input wavelengths must be the same length."
     n_pix = len(wl_f)
 
+    assert len(wl_f_predict) == len(wl_g_predict), "Prediction wavelengths must be the same length."
+    n_pix_predict = len(wl_f_predict)
+
     # Convert mu constants into vectors
-    mu_f = mu_f * np.ones(n_pix)
-    mu_g = mu_g * np.ones(n_pix)
+    mu_f = mu_f * np.ones(n_pix_predict)
+    mu_g = mu_g * np.ones(n_pix_predict)
 
     # Cat these into a single vector
     mu_cat = np.hstack((mu_f, mu_g))
 
+
+    # Create the matrices for the input data
     V11_f = np.empty((n_pix, n_pix), dtype=np.float)
     V11_g = np.empty((n_pix, n_pix), dtype=np.float)
 
@@ -206,11 +211,27 @@ def predict_f_g(wl_f, wl_g, fl_fg, sigma_fg, mu_f, amp_f, l_f, mu_g, amp_g, l_g)
 
     factor, flag = cho_factor(B)
 
-    zeros = np.zeros((n_pix, n_pix))
-    A = np.vstack((np.hstack([V11_f, zeros]), np.hstack([zeros, V11_g])))
+    # Now create separate matrices for the prediction
+    V11_f_predict = np.empty((n_pix_predict, n_pix_predict), dtype=np.float)
+    V11_g_predict = np.empty((n_pix_predict, n_pix_predict), dtype=np.float)
+
+    matrix_functions.fill_V11_f(V11_f_predict, wl_f_predict, amp_f, l_f)
+    matrix_functions.fill_V11_f(V11_g_predict, wl_g_predict, amp_g, l_g)
+
+    zeros = np.zeros((n_pix_predict, n_pix_predict))
+    A = np.vstack((np.hstack([V11_f_predict, zeros]), np.hstack([zeros, V11_g_predict])))
     # A[np.diag_indices_from(A)] += 1e-4 # Add a small nugget term
 
-    C = np.vstack((V11_f, V11_g))
+    # C is now the cross-matrices between the predicted wavelengths and the data wavelengths
+    V12_f = np.empty((n_pix_predict, n_pix), dtype=np.float)
+    V12_g = np.empty((n_pix_predict, n_pix), dtype=np.float)
+
+    matrix_functions.fill_V12_f(V12_f, wl_f_predict, wl_f, amp_f, l_f)
+    matrix_functions.fill_V12_f(V12_g, wl_g_predict, wl_g, amp_g, l_g)
+
+    C = np.vstack((V12_f, V12_g))
+
+    # print("Shapes.\n fl: {} \n A: {} \n B: {} \n C: {}".format(fl_fg.shape, A.shape, B.shape, C.shape))
 
     # the 1.0 signifies that mu_f + mu_g = mu_fg = 1
     mu = mu_cat + np.dot(C, cho_solve((factor, flag), fl_fg - 1.0))
@@ -243,7 +264,7 @@ def predict_f_g_sum(wl_f, wl_g, fl_fg, sigma_fg, wl_f_predict, wl_g_predict, mu_
     V22_f = np.empty((N,N), dtype=np.float)
     V22_g = np.empty((N,N), dtype=np.float)
 
-    # It's a square matrix, so we can just reuse fil_V11_f
+    # It's a square matrix, so we can just reuse fill_V11_f
     matrix_functions.fill_V11_f(V22_f, wl_f, amp_f, l_f)
     matrix_functions.fill_V11_f(V22_g, wl_g, amp_g, l_g)
     V22 = V22_f + V22_g
@@ -251,7 +272,10 @@ def predict_f_g_sum(wl_f, wl_g, fl_fg, sigma_fg, wl_f_predict, wl_g_predict, mu_
 
     factor, flag = cho_factor(V22)
 
-    mu = mu_fg + np.dot(V12.T, cho_solve((factor, flag), (fl_fg - 1.0)))
+    # print("Shapes.\n fl: {} \n V11: {} \n V22: {} \n V12: {}".format(fl_fg.shape, V11.shape, V22.shape, V12.shape))
+
+
+    mu = mu_fg + np.dot(V12, cho_solve((factor, flag), (fl_fg - 1.0)))
     Sigma = V11 - np.dot(V12, cho_solve((factor, flag), V12.T))
 
     return mu, Sigma

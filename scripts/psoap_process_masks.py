@@ -8,6 +8,8 @@ import numpy as np
 import psoap.constants as C
 from psoap.data import Spectrum, Chunk
 
+import multiprocessing as mp
+
 import yaml
 
 try:
@@ -31,19 +33,21 @@ print("Appyling the following masks")
 print(masks)
 
 # go through each chunk, search all masks to build up a total mask, then re-save that chunk
-for chunk in chunks:
+def process_chunk(chunk):
     order, wl0, wl1 = chunk
     chunkSpec = Chunk.open(order, wl0, wl1)
+
+    print("Processing order {}, wl0: {:.1f}, wl1: {:.1f}".format(order, wl0, wl1))
 
     wl = chunkSpec.wl
     fl = chunkSpec.fl
     date = chunkSpec.date
-    print("date", date)
+    # print("date", date)
     date1D = chunkSpec.date1D
 
     # start with a full mask (all points included)
     mask = np.ones_like(chunkSpec.wl, dtype="bool")
-    print("sum mask before", np.sum(mask))
+    # print("sum mask before", np.sum(mask))
 
     for region in masks:
         m0, m1, t0, t1 = region
@@ -54,13 +58,11 @@ for chunk in chunks:
         # Now update the total mask as the previous mask AND (NOT submask)
         mask = mask & ~submask
 
-    print("sum mask after", np.sum(mask))
-    print()
+    # print("sum mask after", np.sum(mask))
+    # print()
     chunkSpec.mask = mask
 
-
     chunkSpec.save(order, wl0, wl1)
-
 
     plots_dir = "plots_" + C.chunk_fmt.format(order, wl0, wl1)
     # Go through and re-plot the chunks with highlighted mask points.
@@ -73,3 +75,6 @@ for chunk in chunks:
         ax.set_xlabel(r"$\lambda\quad[\AA]$")
         fig.savefig(plots_dir + "/{:.1f}.png".format(date1D[i]))
         plt.close('all')
+
+pool = mp.Pool(mp.cpu_count())
+pool.map(process_chunk, chunks)
