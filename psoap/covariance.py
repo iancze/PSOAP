@@ -253,7 +253,7 @@ def predict_f_g_sum(wl_f, wl_g, fl_fg, sigma_fg, wl_f_predict, wl_g_predict, mu_
     matrix_functions.fill_V11_f(V11_f, wl_f_predict, amp_f, l_f)
     matrix_functions.fill_V11_f(V11_g, wl_g_predict, amp_g, l_g)
     V11 = V11_f + V11_g
-    V11[np.diag_indices_from(V11)] += 1e-5
+    V11[np.diag_indices_from(V11)] += 1e-8
 
     V12_f = np.empty((M, N), dtype=np.float64)
     V12_g = np.empty((M, N), dtype=np.float64)
