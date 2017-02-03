@@ -15,6 +15,7 @@ def redshift(wl, v):
     '''
     Redshift a collection of wavelengths. This means that a positive velocity corresponds to a lengthening (increase) of the wavelengths in the array.
     '''
+
     wl_red = wl * np.sqrt((C.c_kms + v)/(C.c_kms - v))
     return wl_red
 

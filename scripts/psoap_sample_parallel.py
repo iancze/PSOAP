@@ -185,6 +185,11 @@ class Worker:
         # predict velocities for each epoch
         vAs = self.orb.get_component_velocities()
 
+        # Make sure none are faster than speed of light
+        if np.any(np.abs(vAs) >= C.c_kms):
+            return -np.inf
+
+
         # shift wavelengths according to these velocities to rest-frame of A component
         wls_A = redshift(self.wl, (-vAs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
 
@@ -210,6 +215,11 @@ class Worker:
 
         # predict velocities for each epoch
         vAs, vBs = self.orb.get_component_velocities()
+
+        # Make sure none are faster than speed of light
+        if np.any(np.abs(vAs) >= C.c_kms) or np.any(np.abs(vBs) >= C.c_kms):
+            return -np.inf
+
 
         # shift wavelengths according to these velocities to rest-frame of A component
         wls_A = redshift(self.wl, (-vAs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
@@ -246,6 +256,10 @@ class Worker:
 
         # predict velocities for each epoch
         vAs, vBs, vCs = self.orb.get_component_velocities()
+
+        # Make sure none are faster than speed of light
+        if np.any(np.abs(vAs) >= C.c_kms) or np.any(np.abs(vBs) >= C.c_kms) or np.any(np.abs(vCs) >= C.c_kms):
+            return -np.inf
 
         # shift wavelengths according to these velocities to rest-frame of A component
         wls_A = redshift(self.wl, (-vAs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
