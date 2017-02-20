@@ -121,7 +121,7 @@ chunk_wls = [[5265, 5275]]
 # Measure this as S/N per resolution element. That means that there is a sqrt(2.5) effect.
 
 # let alpha be the percentage of the primary as the total flux.
-ratio = 0.5
+ratio = 0.2
 alpha = (1 / (ratio + 1))
 print("Ratio: {}, alpha: {}".format(ratio, alpha))
 # alpha = 0.90

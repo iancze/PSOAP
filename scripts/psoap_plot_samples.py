@@ -19,6 +19,7 @@ from psoap import utils
 # This first bit of code is run for every invocation of the script
 flatchain = np.load("flatchain.npy")
 flatchain = flatchain[args.burn:]
+np.save("flatchain_burned.npy", flatchain)
 
 print("Last sample is ")
 print(flatchain[-1])

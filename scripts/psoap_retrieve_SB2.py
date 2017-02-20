@@ -2,12 +2,9 @@
 
 import argparse
 
-parser = argparse.ArgumentParser(description="Reconstruct the spectra.")
+parser = argparse.ArgumentParser(description="Reconstruct the composite spectra for A and B component.")
 parser.add_argument("--draws", type=int, default=0, help="In addition to plotting the mean GP, plot several draws of the GP to show the scatter in predicitions.")
 args = parser.parse_args()
-
-
-# Just reconstruct the full spectrum.
 
 draws = (args.draws > 0)
 
@@ -45,12 +42,6 @@ def process_chunk(row):
 
     n_epochs = chunk.n_epochs
     n_pix = chunk.n_pix
-
-
-    # print("Starting")
-    # print(wls.shape)
-    # print(fl.shape)
-    # print(sigma.shape)
 
 
     # Use the parameters specified in the yaml file to create the spectra
@@ -99,15 +90,6 @@ def process_chunk(row):
     wls_A_predict = np.linspace(np.min(wls_A), np.max(wls_A), num=n_pix_predict)
     wls_B_predict = wls_A_predict
 
-    # # First predict the component spectra as mean 1 GPs
-    # print("Entering shapes")
-    # print(wls_A.flatten().shape)
-    # print(wls_B.flatten().shape)
-    # print(fl.flatten().shape)
-    # print(sigma.flatten().shape)
-    # print(wls_A_predict.shape)
-    # print(wls_B_predict.shape)
-
     mu, Sigma = covariance.predict_f_g(wls_A.flatten(), wls_B.flatten(), fl.flatten(), sigma.flatten(), wls_A_predict, wls_B_predict, mu_f=0.0, mu_g=0.0, amp_f=amp_f, l_f=l_f, amp_g=amp_g, l_g=l_g)
 
     mu_f = mu[0:n_pix_predict]
@@ -136,12 +118,6 @@ def process_chunk(row):
 
     if draws:
         for j in range(n_draws):
-            # mu_draw_j = mu_draw[j]
-
-            # mu_draw_f = mu_draw_j[0:n_pix_predict]
-            # mu_draw_g = mu_draw_j[n_pix_predict:]
-            # mu_draw_f.shape = (n_epochs, -1)
-            # mu_draw_g.shape = (n_epochs, -1)
 
             ax[0].plot(wls_A_predict, mu_draw_f[j], color="0.2", lw=0.5)
             ax[1].plot(wls_B_predict, mu_draw_g[j], color="0.2", lw=0.5)
@@ -162,15 +138,14 @@ def process_chunk(row):
     np.save(plots_dir + "/f.npy", np.vstack((wls_A_predict, mu_f)))
     np.save(plots_dir + "/g.npy", np.vstack((wls_B_predict, mu_g)))
 
+    np.save(plots_dir + "/mu.npy", mu)
+    np.save(plots_dir + "/Sigma.npy", Sigma)
+
     if draws:
         np.save(plots_dir + "/f_draws.npy", mu_draw_f)
         np.save(plots_dir + "/g_draws.npy", mu_draw_g)
 
 
-# pool = mp.Pool(2)
-# pool.map(process_chunk, chunks[300:305])
-
-# Don't have enough memory to do this in parallel.
+# A laptop (e.g., mine) doesn't have enough memory to do this in parallel, so only serial for now
 for chunk in chunks:
     process_chunk(chunk)
-# map(process_chunk, chunks[300:305])

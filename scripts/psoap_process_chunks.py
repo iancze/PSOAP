@@ -1,5 +1,12 @@
 #!/usr/bin/env python
 
+import argparse
+
+parser = argparse.ArgumentParser(description="Go through the chunks.dat file and segment the dataset into chunks.")
+parser.add_argument("--plot", action="store_true", help="Make plots of the applied masks.")
+args = parser.parse_args()
+
+
 import os
 import psoap.constants as C
 from psoap.data import Spectrum, Chunk
@@ -46,30 +53,29 @@ def process_chunk(chunk):
     chunkSpec = Chunk(wl, fl, sigma, date)
     chunkSpec.save(order, wl0, wl1)
 
-    # Also create plots of all the spectra.
+    if args.plot:
+        fig, ax = plt.subplots(nrows=1, sharex=True)
 
-    fig, ax = plt.subplots(nrows=1, sharex=True)
+        # Plot in reverse order so that highest S/N spectra are on top
+        for i in range(dataset.n_epochs)[::-1]:
+            ax.plot(wl[i], fl[i])
 
-    # Plot in reverse order so that highest S/N spectra are on top
-    for i in range(dataset.n_epochs)[::-1]:
-        ax.plot(wl[i], fl[i])
-
-    ax.set_xlabel(r"$\lambda\quad[\AA]$")
-    fig.savefig(C.chunk_fmt.format(order, wl0, wl1) + ".png", dpi=300)
-
-    # Now make a separate directory with plots labeled by their date so we can mask problem regions
-    plots_dir = "plots_" + C.chunk_fmt.format(order, wl0, wl1)
-    if not os.path.exists(plots_dir):
-        os.makedirs(plots_dir)
-
-    # plot these relative to the highest S/N flux, so we know what looks suspicious, and what to mask.
-    for i in range(dataset.n_epochs):
-        fig, ax = plt.subplots(nrows=1)
-        ax.plot(wl[0], fl[0], color="0.5")
-        ax.plot(wl[i], fl[i])
         ax.set_xlabel(r"$\lambda\quad[\AA]$")
-        fig.savefig(plots_dir + "/{:.1f}.png".format(date1D[i]))
-        plt.close('all')
+        fig.savefig(C.chunk_fmt.format(order, wl0, wl1) + ".png", dpi=300)
+
+        # Now make a separate directory with plots labeled by their date so we can mask problem regions
+        plots_dir = "plots_" + C.chunk_fmt.format(order, wl0, wl1)
+        if not os.path.exists(plots_dir):
+            os.makedirs(plots_dir)
+
+        # plot these relative to the highest S/N flux, so we know what looks suspicious, and what to mask.
+        for i in range(dataset.n_epochs):
+            fig, ax = plt.subplots(nrows=1)
+            ax.plot(wl[0], fl[0], color="0.5")
+            ax.plot(wl[i], fl[i])
+            ax.set_xlabel(r"$\lambda\quad[\AA]$")
+            fig.savefig(plots_dir + "/{:.1f}.png".format(date1D[i]))
+            plt.close('all')
 
 pool = mp.Pool(mp.cpu_count())
 pool.map(process_chunk, chunks)

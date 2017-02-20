@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 
+import argparse
+
+parser = argparse.ArgumentParser(description="Apply the masks contained in the masks.dat file.")
+parser.add_argument("--plot", action="store_true", help="Make plots of the applied masks.")
+args = parser.parse_args()
 
 from astropy.io import ascii
 import matplotlib.pyplot as plt
@@ -64,17 +69,18 @@ def process_chunk(chunk):
 
     chunkSpec.save(order, wl0, wl1)
 
-    plots_dir = "plots_" + C.chunk_fmt.format(order, wl0, wl1)
-    # Go through and re-plot the chunks with highlighted mask points.
-        # plot these relative to the highest S/N flux, so we know what looks suspicious, and what to mask.
-    for i in range(chunkSpec.n_epochs):
-        fig, ax = plt.subplots(nrows=1)
-        ax.plot(wl[0], fl[0], color="0.5")
-        ax.plot(wl[i], fl[i], color="b")
-        ax.plot(wl[i][~mask[i]], fl[i][~mask[i]], color="r")
-        ax.set_xlabel(r"$\lambda\quad[\AA]$")
-        fig.savefig(plots_dir + "/{:.1f}.png".format(date1D[i]))
-        plt.close('all')
+    if args.plot:
+        plots_dir = "plots_" + C.chunk_fmt.format(order, wl0, wl1)
+        # Go through and re-plot the chunks with highlighted mask points.
+            # plot these relative to the highest S/N flux, so we know what looks suspicious, and what to mask.
+        for i in range(chunkSpec.n_epochs):
+            fig, ax = plt.subplots(nrows=1)
+            ax.plot(wl[0], fl[0], color="0.5")
+            ax.plot(wl[i], fl[i], color="b")
+            ax.plot(wl[i][~mask[i]], fl[i][~mask[i]], color="r")
+            ax.set_xlabel(r"$\lambda\quad[\AA]$")
+            fig.savefig(plots_dir + "/{:.1f}.png".format(date1D[i]))
+            plt.close('all')
 
 pool = mp.Pool(mp.cpu_count())
 pool.map(process_chunk, chunks)
