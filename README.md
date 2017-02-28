@@ -7,6 +7,7 @@ Precision Spectroscopic Orbits A-Parametrically
 
 Copyright Ian Czekala 2016
 
+Preprint available on the arXiv here: [https://arxiv.org/abs/1702.05652](https://arxiv.org/abs/1702.05652)
 
 ## Installation
 
