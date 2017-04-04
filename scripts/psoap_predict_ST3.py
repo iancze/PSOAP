@@ -34,6 +34,34 @@ except FileNotFoundError as e:
 # Load the list of chunks
 chunks = ascii.read(config["chunk_file"])
 
+# Use the parameters specified in the yaml file to create the spectra
+pars = config["parameters"]
+
+q_in = pars["q_in"]
+K_in = pars["K_in"] # km/s
+e_in = pars["e_in"] #
+omega_in = pars["omega_in"] # deg
+P_in = pars["P_in"] # days
+T0_in = pars["T0_in"] # epoch
+
+q_out = pars["q_out"]
+K_out = pars["K_out"] # km/s
+e_out = pars["e_out"] #
+omega_out = pars["omega_out"] # deg
+P_out = pars["P_out"] # days
+T0_out = pars["T0_out"] # epoch
+
+gamma = pars["gamma"] # km/s
+amp_f = pars["amp_f"] # flux
+l_f = pars["l_f"] # km/s
+amp_g = pars["amp_g"] # flux
+l_g = pars["l_g"] # km/s
+amp_h = pars["amp_h"] # flux
+l_h = pars["l_h"] # km/s
+
+
+
+
 for row in chunks:
     # For now, only use the first chunk.
     order, wl0, wl1 = row
@@ -44,32 +72,6 @@ for row in chunks:
     fl = chunk.fl
     sigma = chunk.sigma
     dates = chunk.date1D
-
-    # Use the parameters specified in the yaml file to create the spectra
-    pars = config["parameters"]
-
-    q_in = pars["q_in"]
-    K_in = pars["K_in"] # km/s
-    e_in = pars["e_in"] #
-    omega_in = pars["omega_in"] # deg
-    P_in = pars["P_in"] # days
-    T0_in = pars["T0_in"] # epoch
-
-    q_out = pars["q_out"]
-    K_out = pars["K_out"] # km/s
-    e_out = pars["e_out"] #
-    omega_out = pars["omega_out"] # deg
-    P_out = pars["P_out"] # days
-    T0_out = pars["T0_out"] # epoch
-
-    gamma = pars["gamma"] # km/s
-    amp_f = pars["amp_f"] # flux
-    l_f = pars["l_f"] # km/s
-    amp_g = pars["amp_g"] # flux
-    l_g = pars["l_g"] # km/s
-    amp_h = pars["amp_h"] # flux
-    l_h = pars["l_h"] # km/s
-
 
     orb = orbit.ST3(q_in, K_in, e_in, omega_in, P_in, T0_in, q_out, K_out, e_out, omega_out, P_out, T0_out, gamma, obs_dates=dates)
 

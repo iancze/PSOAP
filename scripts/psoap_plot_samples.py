@@ -25,8 +25,12 @@ print("Last sample is ")
 print(flatchain[-1])
 
 # Load the lnprobabilities and truncate for burn in
-lnprobs = np.load("lnprob.npy")
-lnprobs = lnprobs[args.burn:]
+try:
+    lnprobs = np.load("lnprob.npy")
+    lnprobs = lnprobs[args.burn:]
+except FileNotFoundError:
+    print("lnprob.npy not found.")
+    lnprobs = np.ones_like(flatchain)
 
 niter, ndim = flatchain.shape
 
@@ -42,6 +46,7 @@ f.close()
 
 model = config["model"]
 labels = utils.get_labels(model, config["fix_params"])
+
 
 fig, ax = plt.subplots(nrows=(ndim + 1), ncols=1, figsize=(10, 1.5 * ndim))
 

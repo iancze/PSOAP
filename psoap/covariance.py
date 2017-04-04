@@ -102,13 +102,6 @@ def get_V11(wl_known, sigma_known, amp_f, l_f):
 
     return V11
 
-def get_V11_three(wl_known_A, wl_known_B, wl_known_C, sigma_known, amp_f, l_f, amp_g, l_g, amp_h, l_h):
-
-    V11 = get_C_three(wl_known_A, wl_known_A, wl_known_B, wl_known_B, wl_known_C, wl_known_C, amp_f=amp_f, l_f=l_f, amp_g=amp_g, l_g=l_g, amp_h=amp_h, l_h=l_h)
-
-    V11[np.diag_indices_from(V11)] += sigma_known**2
-
-    return V11
 
 def get_V12(wl_known, wl_predict, amp_f, l_f):
 
@@ -249,65 +242,6 @@ def predict_f_g(wl_f, wl_g, fl_fg, sigma_fg, wl_f_predict, wl_g_predict, mu_f, a
     return mu, Sigma
 
 
-def predict_f_g_sparse(wl_f, wl_g, fl_fg, sigma_fg, wl_f_predict, wl_g_predict, mu_f, amp_f, l_f, mu_g, amp_g, l_g):
-    '''
-    Given that f + g is the flux that we're modeling, jointly predict the components, but using sparse approximation.
-    '''
-    # Assert that wl_f and wl_g are the same length
-    assert len(wl_f) == len(wl_g), "Input wavelengths must be the same length."
-    n_pix = len(wl_f)
-
-    assert len(wl_f_predict) == len(wl_g_predict), "Prediction wavelengths must be the same length."
-    n_pix_predict = len(wl_f_predict)
-
-    # Convert mu constants into vectors
-    mu_f = mu_f * np.ones(n_pix_predict)
-    mu_g = mu_g * np.ones(n_pix_predict)
-
-    # Cat these into a single vector
-    mu_cat = np.hstack((mu_f, mu_g))
-
-
-    # Create the matrices for the input data
-    V11_f = np.empty((n_pix, n_pix), dtype=np.float)
-    V11_g = np.empty((n_pix, n_pix), dtype=np.float)
-
-    matrix_functions.fill_V11_f(V11_f, wl_f, amp_f, l_f)
-    matrix_functions.fill_V11_f(V11_g, wl_g, amp_g, l_g)
-
-    B = V11_f + V11_g
-    B[np.diag_indices_from(B)] += sigma_fg**2
-
-    factor, flag = cho_factor(B)
-
-    # Now create separate matrices for the prediction
-    V11_f_predict = np.empty((n_pix_predict, n_pix_predict), dtype=np.float)
-    V11_g_predict = np.empty((n_pix_predict, n_pix_predict), dtype=np.float)
-
-    matrix_functions.fill_V11_f(V11_f_predict, wl_f_predict, amp_f, l_f)
-    matrix_functions.fill_V11_f(V11_g_predict, wl_g_predict, amp_g, l_g)
-
-    zeros = np.zeros((n_pix_predict, n_pix_predict))
-    A = np.vstack((np.hstack([V11_f_predict, zeros]), np.hstack([zeros, V11_g_predict])))
-    # A[np.diag_indices_from(A)] += 1e-4 # Add a small nugget term
-
-    # C is now the cross-matrices between the predicted wavelengths and the data wavelengths
-    V12_f = np.empty((n_pix_predict, n_pix), dtype=np.float)
-    V12_g = np.empty((n_pix_predict, n_pix), dtype=np.float)
-
-    matrix_functions.fill_V12_f(V12_f, wl_f_predict, wl_f, amp_f, l_f)
-    matrix_functions.fill_V12_f(V12_g, wl_g_predict, wl_g, amp_g, l_g)
-
-    C = np.vstack((V12_f, V12_g))
-
-    # print("Shapes.\n fl: {} \n A: {} \n B: {} \n C: {}".format(fl_fg.shape, A.shape, B.shape, C.shape))
-
-    # the 1.0 signifies that mu_f + mu_g = mu_fg = 1
-    mu = mu_cat + np.dot(C, cho_solve((factor, flag), fl_fg - 1.0))
-    Sigma = A - np.dot(C, cho_solve((factor, flag), C.T))
-
-    return mu, Sigma
-
 def predict_f_g_sum(wl_f, wl_g, fl_fg, sigma_fg, wl_f_predict, wl_g_predict, mu_fg, amp_f, l_f, amp_g, l_g):
 
     # Assert that wl_f and wl_g are the same length
@@ -350,7 +284,7 @@ def predict_f_g_sum(wl_f, wl_g, fl_fg, sigma_fg, wl_f_predict, wl_g_predict, mu_
     return mu, Sigma
 
 
-def predict_f_g_h(wl_f, wl_g, wl_h, fl_fgh, sigma_fgh, mu_f, mu_g, mu_h, amp_f, l_f, amp_g, l_g, amp_h, l_h):
+def predict_f_g_h(wl_f, wl_g, wl_h, fl_fgh, sigma_fgh, wl_f_predict, wl_g_predict, wl_h_predict, mu_f, mu_g, mu_h, amp_f, l_f, amp_g, l_g, amp_h, l_h):
     '''
     Given that f + g + h is the flux that we're modeling, jointly predict the components.
     '''
@@ -359,10 +293,14 @@ def predict_f_g_h(wl_f, wl_g, wl_h, fl_fgh, sigma_fgh, mu_f, mu_g, mu_h, amp_f, 
     assert len(wl_f) == len(wl_h), "Input wavelengths must be the same length."
     n_pix = len(wl_f)
 
+    assert len(wl_f_predict) == len(wl_g_predict), "Prediction wavelengths must be the same length."
+    assert len(wl_f_predict) == len(wl_h_predict), "Prediction wavelengths must be the same length."
+    n_pix_predict = len(wl_f_predict)
+
     # Convert mu constants into vectors
-    mu_f = mu_f * np.ones(n_pix)
-    mu_g = mu_g * np.ones(n_pix)
-    mu_h = mu_h * np.ones(n_pix)
+    mu_f = mu_f * np.ones(n_pix_predict)
+    mu_g = mu_g * np.ones(n_pix_predict)
+    mu_h = mu_h * np.ones(n_pix_predict)
 
     # Cat these into a single vector
     mu_cat = np.hstack((mu_f, mu_g, mu_h))
@@ -380,12 +318,29 @@ def predict_f_g_h(wl_f, wl_g, wl_h, fl_fgh, sigma_fgh, mu_f, mu_g, mu_h, amp_f, 
 
     factor, flag = cho_factor(B)
 
-    zeros = np.zeros((n_pix, n_pix))
-    A = np.vstack((np.hstack([V11_f, zeros, zeros]), np.hstack([zeros, V11_g, zeros]), np.hstack([zeros, zeros, V11_h])))
-    # A = A + 1e-5 * np.eye(len(A)) # Add a small nugget term
-    C = np.vstack((V11_f, V11_g, V11_h))
+    # Now create separate matrices for the prediction
+    V11_f_predict = np.empty((n_pix_predict, n_pix_predict), dtype=np.float)
+    V11_g_predict = np.empty((n_pix_predict, n_pix_predict), dtype=np.float)
+    V11_h_predict = np.empty((n_pix_predict, n_pix_predict), dtype=np.float)
 
-    factor, flag = cho_factor(B)
+    # Fill the prediction matrices
+    matrix_functions.fill_V11_f(V11_f_predict, wl_f_predict, amp_f, l_f)
+    matrix_functions.fill_V11_f(V11_g_predict, wl_g_predict, amp_g, l_g)
+    matrix_functions.fill_V11_f(V11_h_predict, wl_h_predict, amp_h, l_h)
+
+    zeros = np.zeros((n_pix_predict, n_pix_predict))
+
+    A = np.vstack((np.hstack([V11_f_predict, zeros, zeros]), np.hstack([zeros, V11_g_predict, zeros]), np.hstack([zeros, zeros, V11_h_predict])))
+
+    V12_f = np.empty((n_pix_predict, n_pix), dtype=np.float)
+    V12_g = np.empty((n_pix_predict, n_pix), dtype=np.float)
+    V12_h = np.empty((n_pix_predict, n_pix), dtype=np.float)
+
+    matrix_functions.fill_V12_f(V12_f, wl_f_predict, wl_f, amp_f, l_f)
+    matrix_functions.fill_V12_f(V12_g, wl_g_predict, wl_g, amp_g, l_g)
+    matrix_functions.fill_V12_f(V12_h, wl_h_predict, wl_h, amp_h, l_h)
+
+    C = np.vstack((V12_f, V12_g, V12_h))
 
     mu = mu_cat + np.dot(C, cho_solve((factor, flag), fl_fgh - 1.0))
     Sigma = A - np.dot(C, cho_solve((factor, flag), C.T))
@@ -751,5 +706,3 @@ def cycle_calibration_chunk(chunk, amp_f, l_f, n_cycles, order=1, limit_array=3,
 
     # Stuff the full set of corrected fluxes (masked points included) back into the chunk.
     chunk.fl[:] = fl_out
-
-    # print(np.allclose(chunk.fl, fl_out))
