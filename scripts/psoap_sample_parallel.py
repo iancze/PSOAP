@@ -4,6 +4,7 @@ import argparse
 
 parser = argparse.ArgumentParser(description="Sample the distribution across multiple chunks.")
 parser.add_argument("run_index", type=int, default=0, help="Which output subdirectory to save this particular run, in the case you may be running multiple concurrently.")
+parser.add_argument("--debug", action="store_true", help="Print out debug commands to log.log")
 args = parser.parse_args()
 
 import yaml
@@ -80,7 +81,8 @@ for chunk in chunks:
 pars = config["parameters"]
 
 # Set up the logger
-logging.basicConfig(format="%(asctime)s - %(levelname)s - %(name)s -  %(message)s", filename="{}log.log".format(routdir), level=logging.DEBUG, filemode="w", datefmt='%m/%d/%Y %I:%M:%S %p')
+if args.debug:
+    logging.basicConfig(format="%(asctime)s - %(levelname)s - %(name)s -  %(message)s", filename="{}log.log".format(routdir), level=logging.DEBUG, filemode="w", datefmt='%m/%d/%Y %I:%M:%S %p')
 
 # Create a partial function which maps a vector of floats to parameters
 convert_vector_p = partial(utils.convert_vector, model=config["model"], fix_params=config["fix_params"], **pars)
@@ -118,7 +120,8 @@ class Worker:
                           }
 
         self.debug = debug
-        self.logger = logging.getLogger("{}".format(self.__class__.__name__))
+        if args.debug:
+            self.logger = logging.getLogger("{}".format(self.__class__.__name__))
 
     def initialize(self, key):
         '''
@@ -146,13 +149,14 @@ class Worker:
         # Total number of wavelength points (after applying mask)
         self.N = data.N
 
-        self.logger = logging.getLogger("{} {}".format(self.__class__.__name__, self.key))
-        if self.debug:
-            self.logger.setLevel(logging.DEBUG)
-        else:
-            self.logger.setLevel(logging.INFO)
+        if args.debug:
+            self.logger = logging.getLogger("{} {}".format(self.__class__.__name__, self.key))
+            if self.debug:
+                self.logger.setLevel(logging.DEBUG)
+            else:
+                self.logger.setLevel(logging.INFO)
 
-        self.logger.info("Initializing model on chunk {}.".format(self.key))
+            self.logger.info("Initializing model on chunk {}.".format(self.key))
 
         # Possibly set up temporary holders for V11 matrix.
         # self.N is the length of the masked, flattened wl vector.
@@ -168,8 +172,9 @@ class Worker:
         Intended to be called from the master process via the command "LNPROB".
         '''
 
-        # Designed to be subclassed based upon what model we want to use.
-        self.logger.debug("Updating orbital parameters to {}".format(p))
+        if args.debug:
+            # Designed to be subclassed based upon what model we want to use.
+            self.logger.debug("Updating orbital parameters to {}".format(p))
 
         # unroll p
         K, e, omega, P, T0, gamma, amp_f, l_f = convert_vector_p(p)
@@ -228,7 +233,7 @@ class Worker:
         # fill out covariance matrix
         lnp = covariance.lnlike_f_g(self.V11, wls_A.flatten(), wls_B.flatten(), self.fl, self.sigma, amp_f, l_f, amp_g, l_g)
 
-        if lnp == -np.inf:
+        if lnp == -np.inf and args.debug:
             self.logger.debug("Worker {} evaulated -np.inf".format(self.key))
 
         gc.collect()
@@ -269,7 +274,7 @@ class Worker:
         # fill out covariance matrix
         lnp = covariance.lnlike_f_g_h(self.V11, wls_A.flatten(), wls_B.flatten(), wls_C.flatten(), self.fl, self.sigma, amp_f, l_f, amp_g, l_g, amp_h, l_h)
 
-        if lnp == -np.inf:
+        if lnp == -np.inf and args.debug:
             self.logger.debug("Worker {} evaulated -np.inf".format(self.key))
 
         gc.collect()
@@ -282,7 +287,8 @@ class Worker:
         '''
         Wrap up the sampling and write the samples to disk.
         '''
-        self.logger.debug("Finishing")
+        if args.debug:
+            self.logger.debug("Finishing")
 
     def brain(self, conn):
         '''
@@ -307,13 +313,15 @@ class Worker:
         # info("brain")
 
         fname, arg = self.conn.recv() # Waits here to receive a new message
-        self.logger.debug("{} received message {}".format(os.getpid(), (fname, arg)))
+        if args.debug:
+            self.logger.debug("{} received message {}".format(os.getpid(), (fname, arg)))
 
         func = self.func_dict.get(fname, False)
         if func:
             response = func(arg)
         else:
-            self.logger.info("Given an unknown function {}, assuming kill signal.".format(fname))
+            if args.debug:
+                self.logger.info("Given an unknown function {}, assuming kill signal.".format(fname))
             return False
 
         # Functions only return a response other than None when they want them
@@ -321,7 +329,8 @@ class Worker:
         # Some commands sent to the child processes do not require a response
         # to the main process.
         if response:
-            self.logger.debug("{} sending back {}".format(os.getpid(), response))
+            if args.debug:
+                self.logger.debug("{} sending back {}".format(os.getpid(), response))
             self.conn.send(response)
         return True
 
@@ -365,12 +374,13 @@ def profile_code():
     #Evaluate one complete iteration from delivery of stellar parameters from master process
 
     #Master proposal
-    stellar_Starting.update({"logg":4.29})
-    model.stellar_lnprob(stellar_Starting)
+    # stellar_Starting.update({"logg":4.29})
+    # model.stellar_lnprob(stellar_Starting)
     #Assume we accepted
-    model.decide_stellar(True)
+    # model.decide_stellar(True)
 
     #Right now, assumes Kurucz order 23
+    pass
 
 def test():
 

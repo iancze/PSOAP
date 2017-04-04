@@ -502,8 +502,80 @@ def optimize_epoch_velocity(wl_epoch, fl_epoch, sigma_epoch, wl_fixed, fl_fixed,
 
     return ans["x"][0]
 
+# New (as of 4/4/17) routine to incorporate more complex covariance matrices in the optimization routine, which can incorporate orbital motion.
+def optimize_calibration(wl_cal, fl_cal, fl_fixed, A, B, C, order=1, mu_GP=1.0):
+    '''
+    Determine the calibration parameters for this epoch of observations.
 
-def optimize_calibration(wl0, wl1, wl_cal, fl_cal, sigma_cal, wl_fixed, fl_fixed, sigma_fixed, amp, l_f, order=1, mu_GP=1.0):
+    This is a more general method than optimize_calibration_static, since it allows arbitrary covariance matrices, which should be used when there is orbital motion.
+
+    wl_cal: the wavelengths corresponding to the epoch we want to calibrate
+    fl_cal: the fluxes corresponding to the epoch we want to calibrate
+
+    fl_fixed: the remaining epochs of data to calibrate in reference to.
+
+    A : matrix_functions.fill_V11_f(A, wl_cal, amp, l_f) with sigma_cal already added to the diagonal
+    B : matrix_functions.fill_V11_f(B, wl_fixed, amp, l_f) with sigma_fixed already added to the diagonal
+    C : matrix_functions.fill_V12_f(C, wl_cal, wl_fixed, amp, l_f) cross matrix (with no sigma added, since these are independent measurements).
+
+    order: the degree polynomial to use. order = 1 is a line, order = 2 is a line + parabola
+
+    Assumes that covariance matrices are appropriately filled out.
+    '''
+
+    # basically, assume that A, B, and C are already filled out.
+    # the only thing this routine needs to do is fill out the Q matrix
+
+    wl0 = np.min(wl_cal)
+    wl1 = np.max(wl_cal)
+
+    # Get a clean set of the Chebyshev polynomials evaluated on the input wavelengths
+    T = []
+    for i in range(0, order + 1):
+        coeff = [0 for j in range(i)] + [1]
+        Chtemp = Ch(coeff, domain=[wl0, wl1])
+        Ttemp = Chtemp(wl_cal)
+        T += [Ttemp]
+
+    T = np.array(T)
+
+    D = fl_cal[:,np.newaxis] * T.T
+
+
+    # Solve for the calibration coefficients c0, c1, ...
+
+    # Find B^{-1}, fl_prime, and C_prime
+    try:
+        B_cho = cho_factor(B)
+    except np.linalg.linalg.LinAlgError:
+        print("Failed to solve matrix inverse. Calibration not valid.")
+        raise
+
+    fl_prime = mu_GP + np.dot(C, cho_solve(B_cho, (fl_fixed.flatten() - mu_GP)))
+    C_prime = A - np.dot(C, cho_solve(B_cho, C.T))
+
+    # Find {C^\prime}^{-1}
+    CP_cho = cho_factor(C_prime)
+
+    # Invert the least squares problem
+    left = np.dot(D.T, cho_solve(CP_cho, D))
+    right = np.dot(D.T, cho_solve(CP_cho, fl_prime))
+
+    left_cho = cho_factor(left)
+
+    # the coefficents, X = [c0, c1]
+    X = cho_solve(left_cho, right)
+
+    # Apply the correction
+    fl_cor = np.dot(D, X)
+
+    # Return both the corrected flux and the coefficients, in case we want to log them,
+    # or apply the correction later.
+    return fl_cor, X
+
+
+# Previous optimize calibration routine that assumed that relative velocities between all epochs were zero.
+def optimize_calibration_static(wl0, wl1, wl_cal, fl_cal, sigma_cal, wl_fixed, fl_fixed, sigma_fixed, amp, l_f, order=1, mu_GP=1.0):
     '''
     Determine the calibration parameters for this epoch of observations.
     Assumes all wl, fl arrays are 1D.
@@ -566,48 +638,6 @@ def optimize_calibration(wl0, wl1, wl_cal, fl_cal, sigma_cal, wl_fixed, fl_fixed
 
     # the coefficents, X = [c0, c1]
     X = cho_solve(left_cho, right)
-
-    # Apply the correction
-    fl_cor = np.dot(D, X)
-
-    return fl_cor, X
-
-def optimize_calibration_python(wl_cal, fl_cal, sigma_cal, wl_fixed, fl_fixed, sigma_fixed, amp, l_f, mu_GP=1.0):
-    '''
-    Determine the calibration parameters for this epoch of observations.
-    Assumes all wl, fl arrays are 1D.
-
-    returns a corrected fl_cal, as well as c0 and c1
-    '''
-
-    A = get_V11(wl_cal, sigma_cal, amp, l_f)
-    B = get_V11(wl_fixed, sigma_fixed, amp, l_f)
-    C = get_V12(wl_cal, wl_fixed, amp, l_f)
-
-    # For now, only include c0, c1. Could later expand to c2, c3, as well as Chebyshev, etc.
-    D = fl_cal[:,np.newaxis] * np.array([np.ones_like(fl_cal), wl_cal]).T
-
-    # Solve for the calibration coefficients c0, c1
-
-    # Find B^{-1}, fl_prime, and C_prime
-    B_cho = cho_factor(B)
-    fl_prime = mu_GP + np.dot(C, cho_solve(B_cho, (fl_fixed.flatten() - mu_GP)))
-    C_prime = A - np.dot(C, cho_solve(B_cho, C.T))
-
-    # Find {C^\prime}^{-1}
-    CP_cho = cho_factor(C_prime)
-
-    # Invert the least squares problem
-    left = np.dot(D.T, cho_solve(CP_cho, D))
-    right = np.dot(D.T, cho_solve(CP_cho, fl_prime))
-
-    left_cho = cho_factor(left)
-
-    # the coefficents, X = [c0, c1]
-    X = cho_solve(left_cho, right)
-
-    # Check that we have the right shapes.
-    line = X[0] + X[1] * wl_cal
 
     # Apply the correction
     fl_cor = np.dot(D, X)
