@@ -34,20 +34,27 @@ dataset = Spectrum(config["data_file"])
 # sort by signal-to-noise
 dataset.sort_by_SN()
 
+# limit?
+limit = config["epoch_limit"]
+if limit > dataset.n_epochs:
+    limit = dataset.n_epochs
+
 def process_chunk(chunk):
     order, wl0, wl1 = chunk
 
-    print("Processing order {}, wl0: {:.1f}, wl1: {:.1f}".format(order, wl0, wl1))
+    print("Processing order {}, wl0: {:.1f}, wl1: {:.1f} and limiting to {:} highest S/N epochs.".format(order, wl0, wl1, limit))
 
+    # higest S/N epoch
     wl = dataset.wl[0, order, :]
 
     ind = (wl > wl0) & (wl < wl1)
 
-    wl = dataset.wl[:, order, ind]
-    fl = dataset.fl[:, order, ind]
-    sigma = dataset.sigma[:, order, ind]
-    date = dataset.date[:, order, ind]
-    date1D = dataset.date1D
+    # limit these to the epochs we want, for computational purposes
+    wl = dataset.wl[:limit, order, ind]
+    fl = dataset.fl[:limit, order, ind]
+    sigma = dataset.sigma[:limit, order, ind]
+    date = dataset.date[:limit, order, ind]
+    date1D = dataset.date1D[:limit]
 
     # Stuff this into a chunk object, and save it
     chunkSpec = Chunk(wl, fl, sigma, date)
@@ -57,7 +64,7 @@ def process_chunk(chunk):
         fig, ax = plt.subplots(nrows=1, sharex=True)
 
         # Plot in reverse order so that highest S/N spectra are on top
-        for i in range(dataset.n_epochs)[::-1]:
+        for i in range(limit)[::-1]:
             ax.plot(wl[i], fl[i])
 
         ax.set_xlabel(r"$\lambda\quad[\AA]$")
@@ -69,7 +76,7 @@ def process_chunk(chunk):
             os.makedirs(plots_dir)
 
         # plot these relative to the highest S/N flux, so we know what looks suspicious, and what to mask.
-        for i in range(dataset.n_epochs):
+        for i in range(limit):
             fig, ax = plt.subplots(nrows=1)
             ax.plot(wl[0], fl[0], color="0.5")
             ax.plot(wl[i], fl[i])

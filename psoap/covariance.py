@@ -503,9 +503,11 @@ def optimize_epoch_velocity(wl_epoch, fl_epoch, sigma_epoch, wl_fixed, fl_fixed,
     return ans["x"][0]
 
 # New (as of 4/4/17) routine to incorporate more complex covariance matrices in the optimization routine, which can incorporate orbital motion.
-def optimize_calibration(wl_cal, fl_cal, fl_fixed, A, B, C, order=1, mu_GP=1.0):
+def optimize_calibration(wl0, wl1, wl_cal, fl_cal, fl_fixed, A, B, C, order=1, mu_GP=1.0):
     '''
     Determine the calibration parameters for this epoch of observations.
+
+    wl0, wl1: set the points for the Chebyshev.
 
     This is a more general method than optimize_calibration_static, since it allows arbitrary covariance matrices, which should be used when there is orbital motion.
 
@@ -525,9 +527,6 @@ def optimize_calibration(wl_cal, fl_cal, fl_fixed, A, B, C, order=1, mu_GP=1.0):
 
     # basically, assume that A, B, and C are already filled out.
     # the only thing this routine needs to do is fill out the Q matrix
-
-    wl0 = np.min(wl_cal)
-    wl1 = np.max(wl_cal)
 
     # Get a clean set of the Chebyshev polynomials evaluated on the input wavelengths
     T = []

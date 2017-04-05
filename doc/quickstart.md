@@ -19,6 +19,11 @@ and then the masks are applied by running
 
 `psoap_process_masks.py`
 
+To tweak the calibration (may want to have an orbit in mind, first)
+
+`psoap_process_calibration.py`
+`psoap_plot_calibration.py`
+`psoap_apply_calibration.py`
 
 To infer parameters,
 
