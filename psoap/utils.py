@@ -159,8 +159,6 @@ def estimate_covariance(flatchain, ndim=0):
 
     #Now try correlation coefficient
     cor = np.corrcoef(flatchain, rowvar=0)
-    print("Correlation coefficient")
-    print(cor)
 
     # Make a plot of correlation coefficient.
 
@@ -173,11 +171,8 @@ def estimate_covariance(flatchain, ndim=0):
 
     opt_jump = 2.38**2/d * cov
     # opt_jump = 1.7**2/d * cov # gives about ??
-    print(opt_jump)
 
-    print("Standard deviation")
     std_dev = np.sqrt(np.diag(cov))
-    print(std_dev)
 
     print("'Optimal' jumps")
     print(2.38/np.sqrt(d) * std_dev)

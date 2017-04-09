@@ -68,12 +68,21 @@ def process_chunk(row):
     # shift wavelengths according to these velocities to rest-frame of A component
     # Load the data
     wls = chunk.wl
+    lwls = chunk.lwl
+
     wls_A = redshift(wls, -vAs[:,np.newaxis])
     wls_B = redshift(wls, -vBs[:,np.newaxis])
+
+    lwls_A = lredshift(lwls, -vAs[:,np.newaxis])
+    lwls_B = lredshift(lwls, -vBs[:,np.newaxis])
+
 
     chunk.apply_mask()
     wls_A = wls_A[chunk.mask]
     wls_B = wls_B[chunk.mask]
+
+    lwls_A = lwls_A[chunk.mask]
+    lwls_B = lwls_B[chunk.mask]
 
     # reload this, including the masked data
     fl = chunk.fl
@@ -87,10 +96,13 @@ def process_chunk(row):
     n_pix_predict = 2 * n_pix
 
     # These are the same input wavelegths.
-    wls_A_predict = np.linspace(np.min(wls_A), np.max(wls_A), num=n_pix_predict)
+    lwls_A_predict = np.linspace(np.min(lwls_A), np.max(lwls_A), num=n_pix_predict)
+    wls_A_predict = np.exp(lwls_A_predict)
+
+    lwls_B_predict = lwls_A_predict
     wls_B_predict = wls_A_predict
 
-    mu, Sigma = covariance.predict_f_g(wls_A.flatten(), wls_B.flatten(), fl.flatten(), sigma.flatten(), wls_A_predict, wls_B_predict, mu_f=0.0, mu_g=0.0, amp_f=amp_f, l_f=l_f, amp_g=amp_g, l_g=l_g)
+    mu, Sigma = covariance.predict_f_g(lwls_A.flatten(), lwls_B.flatten(), fl.flatten(), sigma.flatten(), lwls_A_predict, lwls_B_predict, mu_f=0.0, mu_g=0.0, amp_f=amp_f, l_f=l_f, amp_g=amp_g, l_g=l_g)
 
     mu_f = mu[0:n_pix_predict]
     mu_g = mu[n_pix_predict:]

@@ -188,7 +188,7 @@ class Worker:
         self.orb.gamma = gamma
 
         # predict velocities for each epoch
-        vAs = self.orb.get_component_velocities()
+        vAs = self.orb.get_component_velocities()[0]
 
         # Make sure none are faster than speed of light
         if np.any(np.abs(vAs) >= C.c_kms):

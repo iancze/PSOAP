@@ -7,137 +7,30 @@ from scipy.optimize import minimize
 import psoap
 from psoap import constants as C
 from psoap import matrix_functions
-from psoap.data import redshift
-
-# Covariance Kernel Functions
-# To be later fed into np.from_function routines
-# These functions have been superseeded by those in matrix_functions.pyx, however they are left
-# here to serve as checks in the tests module.
-def sqexp_func(x0i, x1i, x0v=None, x1v=None, amp2=None, l2=None):
-    '''amp is the amplitude
-    lv is the scale length in km/s.
-
-    This funny signature with x0i, x1i, x0v, etc... is so that this function can be later used
-    in the np.from_function routine to create a matrix.'''
-
-    x0 = x0v[x0i]
-    x1 = x1v[x1i]
-
-    # Calculate the distance in km/s
-    r = 0.5 * C.c_kms * (x0v[x0i] - x1v[x1i])/(x0v[x0i] + x1v[x1i]) # Km/s
-    # r = C.c_kms/x0v[x0i] * (x0v[x0i] - x1v[x1i]) # Km/s
-
-    return amp2 * np.exp(-0.5 * r**2 / l2)
+from psoap.data import lredshift
 
 
-def sqexp_func_three(x0i, x1i, f0v=None, f1v=None, g0v=None, g1v=None, h0v=None, h1v=None, amp2f=None, l2f=None, amp2g=None, l2g=None, amp2h=None, l2h=None):
-    '''
-    f0v is the vector of (shifted) wavelengths for the f spectrum
-    f1v is the othre vector
-
-    g0v is the vector for g spectrum,
-
-    h0v, etc.
-    '''
-
-    # Calculate the distance in km/s
-    rf = C.c_kms/f0v[x0i] * (f0v[x0i] - f1v[x1i]) # Km/s
-    rg = C.c_kms/g0v[x0i] * (g0v[x0i] - g1v[x1i]) # Km/s
-    rh = C.c_kms/h0v[x0i] * (h0v[x0i] - h1v[x1i]) # Km/s
-
-    return amp2f * np.exp(-0.5 * rf**2/l2f) + amp2g * np.exp(-0.5 * rg**2/l2g) + amp2h * np.exp(-0.5 * rh**2/l2h)
-
-# These functions deliver a filled covariance matrix (part of V11, V12, V22, etc) from the squared exponential kernels
-def get_C(wl0, wl1, amp, l):
-    '''Returns a covariance matrix that is (len(wl0), len(wl1))'''
-
-    mat = np.fromfunction(sqexp_func, (len(wl0),len(wl1)), x0v=wl0, x1v=wl1, amp2=amp**2, l2=l**2, dtype=np.int)
-
-    return mat
-
-def get_C_three(wlA0, wlA1, wlB0, wlB1, wlC0, wlC1, amp_f, l_f, amp_g, l_g, amp_h, l_h):
-    '''
-    Returns a covariance matrix as the sum of three Gaussian processes.
-    '''
-
-    mat = np.fromfunction(sqexp_func_three, (len(wlA0), len(wlA1)), f0v=wlA0, f1v=wlA1, g0v=wlB0, g1v=wlB1, h0v=wlC0, h1v=wlC1, amp2f=amp_f**2, l2f=l_f**2, amp2g=amp_g**2, l2g=l_g**2, amp2h=amp_h**2, l2h=l_h**2, dtype=np.int)
-
-    return mat
-
-# These kernel functions are only useful for visualizing the time dependence
-def rt_func(x0i, x1i, d0v=None, d1v=None, tau=None):
-    d0 = d0v[x0i]
-    d1 = d1v[x1i]
-
-    rt = np.abs(d1 - d0) #days
-    return rt
-
-# These kernel functions are only useful for visualizing the time dependence
-def rt_exp_func(x0i, x1i, d0v=None, d1v=None, tau=None):
-    d0 = d0v[x0i]
-    d1 = d1v[x1i]
-
-    rt = np.abs(d1 - d0) #days
-
-    return np.exp(-0.5 * (rt**2/tau**2))
-
-# These functions return a filled covariance matrix for the date distance kernels
-def get_C_rt(d0, d1, tau):
-    mat = np.fromfunction(rt_func, (len(d0), len(d1)), d0v=d0, d1v=d1, tau=tau, dtype=np.int)
-    return mat
-
-def get_C_exp_rt(d0, d1, tau):
-    mat = np.fromfunction(rt_exp_func, (len(d0), len(d1)), d0v=d0, d1v=d1, tau=tau, dtype=np.int)
-    return mat
-
-
-def get_V11(wl_known, sigma_known, amp_f, l_f):
-    '''
-    wl_known is a 1D array.
-    sigma_known is a 1D array.
-    amp and lv are scalar values.
-    '''
-
-    V11 = get_C(wl_known, wl_known, amp_f, l_f) + sigma_known**2 * np.eye(len(wl_known))
-
-    return V11
-
-
-def get_V12(wl_known, wl_predict, amp_f, l_f):
-
-    V12 = get_C(wl_known, wl_predict, amp_f, l_f)
-
-    return V12
-
-def get_V22(wl_predict, amp_f, l_f):
-
-    # Might need a small offset for numerical stability
-    V22 = get_C(wl_predict, wl_predict, amp_f, l_f) + 1e-5 * np.eye(len(wl_predict)) # Add a small nugget
-
-    return V22
-
-
-def predict_f(wl_known, fl_known, sigma_known, wl_predict, amp_f, l_f, mu_GP=1.0):
+def predict_f(lwl_known, fl_known, sigma_known, lwl_predict, amp_f, l_f, mu_GP=1.0):
 
     '''wl_known are known wavelengths.
     wl_predict are the prediction wavelengths.
     Assumes all inputs are 1D arrays.'''
 
     # determine V11, V12, V21, and V22
-    M = len(wl_known)
+    M = len(lwl_known)
     V11 = np.empty((M, M), dtype=np.float64)
-    matrix_functions.fill_V11_f(V11, wl_known, amp_f, l_f)
+    matrix_functions.fill_V11_f(V11, lwl_known, amp_f, l_f)
     # V11[np.diag_indices_from(V11)] += sigma_known**2
     V11 = V11 + sigma_known**2 * np.eye(M)
 
     N = len(wl_predict)
     V12 = np.empty((M, N), dtype=np.float64)
-    matrix_functions.fill_V12_f(V12, wl_known, wl_predict, amp_f, l_f)
+    matrix_functions.fill_V12_f(V12, lwl_known, lwl_predict, amp_f, l_f)
 
     V22 = np.empty((N, N), dtype=np.float64)
     # V22 is the covariance between the prediction wavelengths
     # The routine to fill V11 is the same as V22
-    matrix_functions.fill_V11_f(V22, wl_predict, amp_f, l_f)
+    matrix_functions.fill_V11_f(V22, lwl_predict, amp_f, l_f)
 
     # Find V11^{-1}
     factor, flag = cho_factor(V11)
@@ -173,16 +66,16 @@ def predict_python(wl_known, fl_known, sigma_known, wl_predict, amp_f, l_f, mu_G
     return (mu, Sigma)
 
 
-def predict_f_g(wl_f, wl_g, fl_fg, sigma_fg, wl_f_predict, wl_g_predict, mu_f, amp_f, l_f, mu_g, amp_g, l_g):
+def predict_f_g(lwl_f, lwl_g, fl_fg, sigma_fg, lwl_f_predict, lwl_g_predict, mu_f, amp_f, l_f, mu_g, amp_g, l_g):
     '''
     Given that f + g is the flux that we're modeling, jointly predict the components.
     '''
     # Assert that wl_f and wl_g are the same length
-    assert len(wl_f) == len(wl_g), "Input wavelengths must be the same length."
-    n_pix = len(wl_f)
+    assert len(lwl_f) == len(lwl_g), "Input wavelengths must be the same length."
+    n_pix = len(lwl_f)
 
-    assert len(wl_f_predict) == len(wl_g_predict), "Prediction wavelengths must be the same length."
-    n_pix_predict = len(wl_f_predict)
+    assert len(lwl_f_predict) == len(lwl_g_predict), "Prediction wavelengths must be the same length."
+    n_pix_predict = len(lwl_f_predict)
 
     # Convert mu constants into vectors
     mu_f = mu_f * np.ones(n_pix_predict)
@@ -198,8 +91,8 @@ def predict_f_g(wl_f, wl_g, fl_fg, sigma_fg, wl_f_predict, wl_g_predict, mu_f, a
     V11_g = np.empty((n_pix, n_pix), dtype=np.float)
 
     # print("filling V11_f, V11_g", n_pix, n_pix)
-    matrix_functions.fill_V11_f(V11_f, wl_f, amp_f, l_f)
-    matrix_functions.fill_V11_f(V11_g, wl_g, amp_g, l_g)
+    matrix_functions.fill_V11_f(V11_f, lwl_f, amp_f, l_f)
+    matrix_functions.fill_V11_f(V11_g, lwl_g, amp_g, l_g)
 
     B = V11_f + V11_g
     B[np.diag_indices_from(B)] += sigma_fg**2
@@ -213,26 +106,22 @@ def predict_f_g(wl_f, wl_g, fl_fg, sigma_fg, wl_f_predict, wl_g_predict, mu_f, a
     V11_g_predict = np.empty((n_pix_predict, n_pix_predict), dtype=np.float)
 
     # print("Filling prediction matrices")
-    matrix_functions.fill_V11_f(V11_f_predict, wl_f_predict, amp_f, l_f)
-    matrix_functions.fill_V11_f(V11_g_predict, wl_g_predict, amp_g, l_g)
+    matrix_functions.fill_V11_f(V11_f_predict, lwl_f_predict, amp_f, l_f)
+    matrix_functions.fill_V11_f(V11_g_predict, lwl_g_predict, amp_g, l_g)
 
-    # print("Allocating A")
     zeros = np.zeros((n_pix_predict, n_pix_predict))
     A = np.vstack((np.hstack([V11_f_predict, zeros]), np.hstack([zeros, V11_g_predict])))
     # A[np.diag_indices_from(A)] += 1e-4 # Add a small nugget term
 
-    # print("Allocating cross-matrices")
     # C is now the cross-matrices between the predicted wavelengths and the data wavelengths
     V12_f = np.empty((n_pix_predict, n_pix), dtype=np.float)
     V12_g = np.empty((n_pix_predict, n_pix), dtype=np.float)
 
     # print("Filling cross-matrices")
-    matrix_functions.fill_V12_f(V12_f, wl_f_predict, wl_f, amp_f, l_f)
-    matrix_functions.fill_V12_f(V12_g, wl_g_predict, wl_g, amp_g, l_g)
+    matrix_functions.fill_V12_f(V12_f, lwl_f_predict, lwl_f, amp_f, l_f)
+    matrix_functions.fill_V12_f(V12_g, lwl_g_predict, lwl_g, amp_g, l_g)
 
     C = np.vstack((V12_f, V12_g))
-
-    # print("Shapes.\n fl: {} \n A: {} \n B: {} \n C: {}".format(fl_fg.shape, A.shape, B.shape, C.shape))
 
     # print("Sloving for mu, sigma")
     # the 1.0 signifies that mu_f + mu_g = mu_fg = 1
@@ -242,41 +131,38 @@ def predict_f_g(wl_f, wl_g, fl_fg, sigma_fg, wl_f_predict, wl_g_predict, mu_f, a
     return mu, Sigma
 
 
-def predict_f_g_sum(wl_f, wl_g, fl_fg, sigma_fg, wl_f_predict, wl_g_predict, mu_fg, amp_f, l_f, amp_g, l_g):
+def predict_f_g_sum(lwl_f, lwl_g, fl_fg, sigma_fg, lwl_f_predict, lwl_g_predict, mu_fg, amp_f, l_f, amp_g, l_g):
 
     # Assert that wl_f and wl_g are the same length
-    assert len(wl_f) == len(wl_g), "Input wavelengths must be the same length."
+    assert len(lwl_f) == len(lwl_g), "Input wavelengths must be the same length."
 
-    M = len(wl_f_predict)
-    N = len(wl_f)
+    M = len(lwl_f_predict)
+    N = len(lwl_f)
 
     V11_f = np.empty((M, M), dtype=np.float)
     V11_g = np.empty((M, M), dtype=np.float)
 
-    matrix_functions.fill_V11_f(V11_f, wl_f_predict, amp_f, l_f)
-    matrix_functions.fill_V11_f(V11_g, wl_g_predict, amp_g, l_g)
+    matrix_functions.fill_V11_f(V11_f, lwl_f_predict, amp_f, l_f)
+    matrix_functions.fill_V11_f(V11_g, lwl_g_predict, amp_g, l_g)
     V11 = V11_f + V11_g
     V11[np.diag_indices_from(V11)] += 1e-8
 
     V12_f = np.empty((M, N), dtype=np.float64)
     V12_g = np.empty((M, N), dtype=np.float64)
-    matrix_functions.fill_V12_f(V12_f, wl_f_predict, wl_f, amp_f, l_f)
-    matrix_functions.fill_V12_f(V12_g, wl_g_predict, wl_g, amp_g, l_g)
+    matrix_functions.fill_V12_f(V12_f, lwl_f_predict, lwl_f, amp_f, l_f)
+    matrix_functions.fill_V12_f(V12_g, lwl_g_predict, lwl_g, amp_g, l_g)
     V12 = V12_f + V12_g
 
     V22_f = np.empty((N,N), dtype=np.float)
     V22_g = np.empty((N,N), dtype=np.float)
 
     # It's a square matrix, so we can just reuse fill_V11_f
-    matrix_functions.fill_V11_f(V22_f, wl_f, amp_f, l_f)
-    matrix_functions.fill_V11_f(V22_g, wl_g, amp_g, l_g)
+    matrix_functions.fill_V11_f(V22_f, lwl_f, amp_f, l_f)
+    matrix_functions.fill_V11_f(V22_g, lwl_g, amp_g, l_g)
     V22 = V22_f + V22_g
     V22[np.diag_indices_from(V22)] += sigma_fg**2
 
     factor, flag = cho_factor(V22)
-
-    # print("Shapes.\n fl: {} \n V11: {} \n V22: {} \n V12: {}".format(fl_fg.shape, V11.shape, V22.shape, V12.shape))
-
 
     mu = mu_fg + np.dot(V12, cho_solve((factor, flag), (fl_fg - 1.0)))
     Sigma = V11 - np.dot(V12, cho_solve((factor, flag), V12.T))
@@ -284,18 +170,18 @@ def predict_f_g_sum(wl_f, wl_g, fl_fg, sigma_fg, wl_f_predict, wl_g_predict, mu_
     return mu, Sigma
 
 
-def predict_f_g_h(wl_f, wl_g, wl_h, fl_fgh, sigma_fgh, wl_f_predict, wl_g_predict, wl_h_predict, mu_f, mu_g, mu_h, amp_f, l_f, amp_g, l_g, amp_h, l_h):
+def predict_f_g_h(lwl_f, lwl_g, lwl_h, fl_fgh, sigma_fgh, lwl_f_predict, lwl_g_predict, lwl_h_predict, mu_f, mu_g, mu_h, amp_f, l_f, amp_g, l_g, amp_h, l_h):
     '''
     Given that f + g + h is the flux that we're modeling, jointly predict the components.
     '''
     # Assert that wl_f and wl_g are the same length
-    assert len(wl_f) == len(wl_g), "Input wavelengths must be the same length."
-    assert len(wl_f) == len(wl_h), "Input wavelengths must be the same length."
-    n_pix = len(wl_f)
+    assert len(lwl_f) == len(lwl_g), "Input wavelengths must be the same length."
+    assert len(lwl_f) == len(lwl_h), "Input wavelengths must be the same length."
+    n_pix = len(lwl_f)
 
-    assert len(wl_f_predict) == len(wl_g_predict), "Prediction wavelengths must be the same length."
-    assert len(wl_f_predict) == len(wl_h_predict), "Prediction wavelengths must be the same length."
-    n_pix_predict = len(wl_f_predict)
+    assert len(lwl_f_predict) == len(lwl_g_predict), "Prediction wavelengths must be the same length."
+    assert len(lwl_f_predict) == len(lwl_h_predict), "Prediction wavelengths must be the same length."
+    n_pix_predict = len(lwl_f_predict)
 
     # Convert mu constants into vectors
     mu_f = mu_f * np.ones(n_pix_predict)
@@ -309,9 +195,9 @@ def predict_f_g_h(wl_f, wl_g, wl_h, fl_fgh, sigma_fgh, wl_f_predict, wl_g_predic
     V11_g = np.empty((n_pix, n_pix), dtype=np.float)
     V11_h = np.empty((n_pix, n_pix), dtype=np.float)
 
-    matrix_functions.fill_V11_f(V11_f, wl_f, amp_f, l_f)
-    matrix_functions.fill_V11_f(V11_g, wl_g, amp_g, l_g)
-    matrix_functions.fill_V11_f(V11_h, wl_h, amp_h, l_h)
+    matrix_functions.fill_V11_f(V11_f, lwl_f, amp_f, l_f)
+    matrix_functions.fill_V11_f(V11_g, lwl_g, amp_g, l_g)
+    matrix_functions.fill_V11_f(V11_h, lwl_h, amp_h, l_h)
 
     B = V11_f + V11_g + V11_h
     B[np.diag_indices_from(B)] += sigma_fgh**2
@@ -324,9 +210,9 @@ def predict_f_g_h(wl_f, wl_g, wl_h, fl_fgh, sigma_fgh, wl_f_predict, wl_g_predic
     V11_h_predict = np.empty((n_pix_predict, n_pix_predict), dtype=np.float)
 
     # Fill the prediction matrices
-    matrix_functions.fill_V11_f(V11_f_predict, wl_f_predict, amp_f, l_f)
-    matrix_functions.fill_V11_f(V11_g_predict, wl_g_predict, amp_g, l_g)
-    matrix_functions.fill_V11_f(V11_h_predict, wl_h_predict, amp_h, l_h)
+    matrix_functions.fill_V11_f(V11_f_predict, lwl_f_predict, amp_f, l_f)
+    matrix_functions.fill_V11_f(V11_g_predict, lwl_g_predict, amp_g, l_g)
+    matrix_functions.fill_V11_f(V11_h_predict, lwl_h_predict, amp_h, l_h)
 
     zeros = np.zeros((n_pix_predict, n_pix_predict))
 
@@ -336,9 +222,9 @@ def predict_f_g_h(wl_f, wl_g, wl_h, fl_fgh, sigma_fgh, wl_f_predict, wl_g_predic
     V12_g = np.empty((n_pix_predict, n_pix), dtype=np.float)
     V12_h = np.empty((n_pix_predict, n_pix), dtype=np.float)
 
-    matrix_functions.fill_V12_f(V12_f, wl_f_predict, wl_f, amp_f, l_f)
-    matrix_functions.fill_V12_f(V12_g, wl_g_predict, wl_g, amp_g, l_g)
-    matrix_functions.fill_V12_f(V12_h, wl_h_predict, wl_h, amp_h, l_h)
+    matrix_functions.fill_V12_f(V12_f, lwl_f_predict, lwl_f, amp_f, l_f)
+    matrix_functions.fill_V12_f(V12_g, lwl_g_predict, lwl_g, amp_g, l_g)
+    matrix_functions.fill_V12_f(V12_h, lwl_h_predict, lwl_h, amp_h, l_h)
 
     C = np.vstack((V12_f, V12_g, V12_h))
 
@@ -347,32 +233,32 @@ def predict_f_g_h(wl_f, wl_g, wl_h, fl_fgh, sigma_fgh, wl_f_predict, wl_g_predic
 
     return mu, Sigma
 
-def predict_f_g_h_sum(wl_f, wl_g, wl_h, fl_fgh, sigma_fgh, wl_f_predict, wl_g_predict, wl_h_predict, mu_fgh, amp_f, l_f, amp_g, l_g, amp_h, l_h):
+def predict_f_g_h_sum(lwl_f, lwl_g, lwl_h, fl_fgh, sigma_fgh, lwl_f_predict, lwl_g_predict, lwl_h_predict, mu_fgh, amp_f, l_f, amp_g, l_g, amp_h, l_h):
     '''
     Given that f + g + h is the flux that we're modeling, predict the joint sum.
     '''
     # Assert that wl_f and wl_g are the same length
-    assert len(wl_f) == len(wl_g), "Input wavelengths must be the same length."
+    assert len(lwl_f) == len(lwl_g), "Input wavelengths must be the same length."
 
-    M = len(wl_f_predict)
-    N = len(wl_f)
+    M = len(lwl_f_predict)
+    N = len(lwl_f)
 
     V11_f = np.empty((M, M), dtype=np.float)
     V11_g = np.empty((M, M), dtype=np.float)
     V11_h = np.empty((M, M), dtype=np.float)
 
-    matrix_functions.fill_V11_f(V11_f, wl_f_predict, amp_f, l_f)
-    matrix_functions.fill_V11_f(V11_g, wl_g_predict, amp_g, l_g)
-    matrix_functions.fill_V11_f(V11_h, wl_h_predict, amp_h, l_h)
+    matrix_functions.fill_V11_f(V11_f, lwl_f_predict, amp_f, l_f)
+    matrix_functions.fill_V11_f(V11_g, lwl_g_predict, amp_g, l_g)
+    matrix_functions.fill_V11_f(V11_h, lwl_h_predict, amp_h, l_h)
     V11 = V11_f + V11_g + V11_h
     # V11[np.diag_indices_from(V11)] += 1e-5 # small nugget term
 
     V12_f = np.empty((M, N), dtype=np.float64)
     V12_g = np.empty((M, N), dtype=np.float64)
     V12_h = np.empty((M, N), dtype=np.float64)
-    matrix_functions.fill_V12_f(V12_f, wl_f_predict, wl_f, amp_f, l_f)
-    matrix_functions.fill_V12_f(V12_g, wl_g_predict, wl_g, amp_g, l_g)
-    matrix_functions.fill_V12_f(V12_h, wl_h_predict, wl_h, amp_h, l_h)
+    matrix_functions.fill_V12_f(V12_f, lwl_f_predict, lwl_f, amp_f, l_f)
+    matrix_functions.fill_V12_f(V12_g, lwl_g_predict, lwl_g, amp_g, l_g)
+    matrix_functions.fill_V12_f(V12_h, lwl_h_predict, lwl_h, amp_h, l_h)
     V12 = V12_f + V12_g + V12_h
 
     V22_f = np.empty((N,N), dtype=np.float)
@@ -380,9 +266,9 @@ def predict_f_g_h_sum(wl_f, wl_g, wl_h, fl_fgh, sigma_fgh, wl_f_predict, wl_g_pr
     V22_h = np.empty((N,N), dtype=np.float)
 
     # It's a square matrix, so we can just reuse fil_V11_f
-    matrix_functions.fill_V11_f(V22_f, wl_f, amp_f, l_f)
-    matrix_functions.fill_V11_f(V22_g, wl_g, amp_g, l_g)
-    matrix_functions.fill_V11_f(V22_h, wl_h, amp_h, l_h)
+    matrix_functions.fill_V11_f(V22_f, lwl_f, amp_f, l_f)
+    matrix_functions.fill_V11_f(V22_g, lwl_g, amp_g, l_g)
+    matrix_functions.fill_V11_f(V22_h, lwl_h, amp_h, l_h)
     V22 = V22_f + V22_g + V22_h
     V22[np.diag_indices_from(V22)] += sigma_fgh**2
 
@@ -477,7 +363,7 @@ def optimize_GP_f(wl_known, fl_known, sigma_known, amp_f, l_f, mu_GP=1.0):
 
     return ans["x"]
 
-def optimize_epoch_velocity(wl_epoch, fl_epoch, sigma_epoch, wl_fixed, fl_fixed, sigma_fixed, amp_f, l_f, mu_GP=1.0):
+def optimize_epoch_velocity(lwl_epoch, fl_epoch, sigma_epoch, lwl_fixed, fl_fixed, sigma_fixed, amp_f, l_f, mu_GP=1.0):
     '''
     Optimize the wavelengths of the chosen epoch relative to the fixed wavelengths. Identify the velocity required to redshift the chosen epoch.
     '''
@@ -488,11 +374,11 @@ def optimize_epoch_velocity(wl_epoch, fl_epoch, sigma_epoch, wl_fixed, fl_fixed,
     def func(v):
         try:
             # Doppler shift the input wl_epoch
-            wl_shift = redshift(wl_epoch, v)
+            lwl_shift = lredshift(lwl_epoch, v)
 
             # Reconcatenate spectra into 1D array
-            wl = np.concatenate((wl_shift, wl_fixed)).flatten()
-            return -lnlike_GP(wl, fl, sigma, amp_f, l_f, mu_GP)
+            lwl = np.concatenate((lwl_shift, lwl_fixed)).flatten()
+            return -lnlike_GP(lwl, fl, sigma, amp_f, l_f, mu_GP)
         except np.linalg.linalg.LinAlgError:
             return np.inf
 
@@ -503,22 +389,87 @@ def optimize_epoch_velocity(wl_epoch, fl_epoch, sigma_epoch, wl_fixed, fl_fixed,
     return ans["x"][0]
 
 # New (as of 4/4/17) routine to incorporate more complex covariance matrices in the optimization routine, which can incorporate orbital motion.
-def optimize_calibration(wl0, wl1, wl_cal, fl_cal, fl_fixed, A, B, C, order=1, mu_GP=1.0):
+
+# uses smart inverse from Celerite
+def optimize_calibration_ST1(lwl0, lwl1, lwl_cal, fl_cal, fl_fixed, gp, A, C, mu_GP=1.0, order=1):
     '''
     Determine the calibration parameters for this epoch of observations.
 
-    wl0, wl1: set the points for the Chebyshev.
+    lwl0, lwl1: set the points for the Chebyshev.
 
     This is a more general method than optimize_calibration_static, since it allows arbitrary covariance matrices, which should be used when there is orbital motion.
 
-    wl_cal: the wavelengths corresponding to the epoch we want to calibrate
+    lwl_cal: the wavelengths corresponding to the epoch we want to calibrate
     fl_cal: the fluxes corresponding to the epoch we want to calibrate
 
     fl_fixed: the remaining epochs of data to calibrate in reference to.
 
-    A : matrix_functions.fill_V11_f(A, wl_cal, amp, l_f) with sigma_cal already added to the diagonal
-    B : matrix_functions.fill_V11_f(B, wl_fixed, amp, l_f) with sigma_fixed already added to the diagonal
-    C : matrix_functions.fill_V12_f(C, wl_cal, wl_fixed, amp, l_f) cross matrix (with no sigma added, since these are independent measurements).
+    gp: the celerite GP
+
+    order: the degree polynomial to use. order = 1 is a line, order = 2 is a line + parabola
+
+    Assumes that covariance matrices are appropriately filled out.
+    '''
+
+    # Get a clean set of the Chebyshev polynomials evaluated on the input wavelengths
+    T = []
+    for i in range(0, order + 1):
+        coeff = [0 for j in range(i)] + [1]
+        Chtemp = Ch(coeff, domain=[lwl0, lwl1])
+        Ttemp = Chtemp(lwl_cal)
+        T += [Ttemp]
+
+    T = np.array(T)
+
+    D = fl_cal[:,np.newaxis] * T.T
+
+
+    # Solve for the calibration coefficients c0, c1, ...
+
+    # Find B^{-1}, fl_prime, and C_prime
+    # B^{-1} corresponds to the gp.apply_inverse
+
+    fl_prime = mu_GP + np.dot(C, gp.apply_inverse(fl_fixed.flatten() - mu_GP))
+
+    C_prime = A - np.dot(C, gp.apply_inverse(C.T))
+
+    # Find {C^\prime}^{-1}
+    CP_cho = cho_factor(C_prime)
+
+    # Invert the least squares problem
+    left = np.dot(D.T, cho_solve(CP_cho, D))
+    right = np.dot(D.T, cho_solve(CP_cho, fl_prime))
+
+    left_cho = cho_factor(left)
+
+    # the coefficents, X = [c0, c1]
+    X = cho_solve(left_cho, right)
+
+    # Apply the correction
+    fl_cor = np.dot(D, X)
+
+    # Return both the corrected flux and the coefficients, in case we want to log them,
+    # or apply the correction later.
+    return fl_cor, X
+
+
+
+def optimize_calibration(lwl0, lwl1, lwl_cal, fl_cal, fl_fixed, A, B, C, order=1, mu_GP=1.0):
+    '''
+    Determine the calibration parameters for this epoch of observations.
+
+    lwl0, lwl1: set the points for the Chebyshev.
+
+    This is a more general method than optimize_calibration_static, since it allows arbitrary covariance matrices, which should be used when there is orbital motion.
+
+    lwl_cal: the wavelengths corresponding to the epoch we want to calibrate
+    fl_cal: the fluxes corresponding to the epoch we want to calibrate
+
+    fl_fixed: the remaining epochs of data to calibrate in reference to.
+
+    A : matrix_functions.fill_V11_f(A, lwl_cal, amp, l_f) with sigma_cal already added to the diagonal
+    B : matrix_functions.fill_V11_f(B, lwl_fixed, amp, l_f) with sigma_fixed already added to the diagonal
+    C : matrix_functions.fill_V12_f(C, lwl_cal, lwl_fixed, amp, l_f) cross matrix (with no sigma added, since these are independent measurements).
 
     order: the degree polynomial to use. order = 1 is a line, order = 2 is a line + parabola
 
@@ -532,8 +483,8 @@ def optimize_calibration(wl0, wl1, wl_cal, fl_cal, fl_fixed, A, B, C, order=1, m
     T = []
     for i in range(0, order + 1):
         coeff = [0 for j in range(i)] + [1]
-        Chtemp = Ch(coeff, domain=[wl0, wl1])
-        Ttemp = Chtemp(wl_cal)
+        Chtemp = Ch(coeff, domain=[lwl0, lwl1])
+        Ttemp = Chtemp(lwl_cal)
         T += [Ttemp]
 
     T = np.array(T)
