@@ -12,7 +12,7 @@ from astropy.io import ascii
 from scipy.linalg import cho_factor, cho_solve
 
 from psoap import constants as C
-from psoap.data import redshift, Chunk
+from psoap.data import redshift, lredshift, Chunk
 from psoap import covariance
 from psoap import orbit
 from psoap import utils
@@ -75,14 +75,15 @@ def process_chunk(row):
 
     # shift wavelengths according to these velocities to rest-frame of A component
     wls = chunk.wl
-    wls_A = redshift(wls, -vAs[:,np.newaxis])
-    wls_B = redshift(wls, -vBs[:,np.newaxis])
-    wls_C = redshift(wls, -vCs[:,np.newaxis])
+    lwls = chunk.lwl
+    lwls_A = lredshift(lwls, -vAs[:,np.newaxis])
+    lwls_B = lredshift(lwls, -vBs[:,np.newaxis])
+    lwls_C = lredshift(lwls, -vCs[:,np.newaxis])
 
     chunk.apply_mask()
-    wls_A = wls_A[chunk.mask]
-    wls_B = wls_B[chunk.mask]
-    wls_C = wls_C[chunk.mask]
+    lwls_A = lwls_A[chunk.mask]
+    lwls_B = lwls_B[chunk.mask]
+    lwls_C = lwls_C[chunk.mask]
 
     # reload this, including the masked data
     fl = chunk.fl
@@ -96,25 +97,24 @@ def process_chunk(row):
     n_pix_predict = 2 * n_pix
 
     # These are the same input wavelegths.
-    wls_A_predict = np.linspace(np.min(wls_A), np.max(wls_A), num=n_pix_predict)
+    lwls_A_predict = np.linspace(np.min(lwls_A), np.max(lwls_A), num=n_pix_predict)
+    wls_A_predict = np.exp(lwls_A_predict)
+
+    lwls_B_predict = lwls_A_predict
     wls_B_predict = wls_A_predict
+
+    lwls_C_predict = lwls_A_predict
     wls_C_predict = wls_A_predict
 
-    mu, Sigma = covariance.predict_f_g_h(wls_A.flatten(), wls_B.flatten(), wls_C.flatten(), fl.flatten(), sigma.flatten(), wls_A_predict, wls_B_predict, wls_C_predict, mu_f=0.0, mu_g=0.0, mu_h=0.0, amp_f=amp_f, l_f=l_f, amp_g=amp_g, l_g=l_g, amp_h=amp_h, l_h=l_h)
+    mu, Sigma = covariance.predict_f_g_h(lwls_A.flatten(), lwls_B.flatten(), lwls_C.flatten(), fl.flatten(), sigma.flatten(), lwls_A_predict, lwls_B_predict, lwls_C_predict, mu_f=0.0, mu_g=0.0, mu_h=0.0, amp_f=amp_f, l_f=l_f, amp_g=amp_g, l_g=l_g, amp_h=amp_h, l_h=l_h)
 
 
     mu_f = mu[0:n_pix_predict]
     mu_g = mu[n_pix_predict:2 * n_pix_predict]
     mu_h = mu[2 * n_pix_predict:]
 
-    print(wls_A_predict.shape)
-    print(mu_f.shape)
-
-    print(wls_C_predict.shape)
-    print(mu_h.shape)
 
     fig, ax = plt.subplots(nrows=3, sharex=True)
-
 
     ax[0].plot(wls_A_predict, mu_f, "b")
     ax[0].set_ylabel(r"$f$")

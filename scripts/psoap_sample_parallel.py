@@ -25,7 +25,7 @@ from astropy.io import ascii
 
 # from psoap.samplers import StateSampler
 import psoap.constants as C
-from psoap.data import Chunk, redshift
+from psoap.data import Chunk, lredshift
 from psoap import utils
 from psoap import orbit
 from psoap import covariance
@@ -136,7 +136,7 @@ class Worker:
         # Load the proper chunk
         data = chunk_data[self.key]
 
-        self.wl = data.wl
+        self.lwl = data.lwl
         self.fl = data.fl
         self.sigma = data.sigma * config["soften"]
         self.date = data.date
@@ -196,10 +196,10 @@ class Worker:
 
 
         # shift wavelengths according to these velocities to rest-frame of A component
-        wls_A = redshift(self.wl, (-vAs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
+        lwls_A = lredshift(self.lwl, (-vAs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
 
         # fill out covariance matrix
-        lnp = covariance.lnlike_f(self.V11, wls_A.flatten(), self.fl, self.sigma, amp_f, l_f)
+        lnp = covariance.lnlike_f(self.V11, lwls_A.flatten(), self.fl, self.sigma, amp_f, l_f)
 
         gc.collect()
 
@@ -227,11 +227,11 @@ class Worker:
 
 
         # shift wavelengths according to these velocities to rest-frame of A component
-        wls_A = redshift(self.wl, (-vAs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
-        wls_B = redshift(self.wl, (-vBs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
+        lwls_A = lredshift(self.lwl, (-vAs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
+        lwls_B = lredshift(self.lwl, (-vBs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
 
         # fill out covariance matrix
-        lnp = covariance.lnlike_f_g(self.V11, wls_A.flatten(), wls_B.flatten(), self.fl, self.sigma, amp_f, l_f, amp_g, l_g)
+        lnp = covariance.lnlike_f_g(self.V11, lwls_A.flatten(), lwls_B.flatten(), self.fl, self.sigma, amp_f, l_f, amp_g, l_g)
 
         if lnp == -np.inf and args.debug:
             self.logger.debug("Worker {} evaulated -np.inf".format(self.key))
@@ -267,12 +267,12 @@ class Worker:
             return -np.inf
 
         # shift wavelengths according to these velocities to rest-frame of A component
-        wls_A = redshift(self.wl, (-vAs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
-        wls_B = redshift(self.wl, (-vBs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
-        wls_C = redshift(self.wl, (-vCs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
+        lwls_A = lredshift(self.lwl, (-vAs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
+        lwls_B = lredshift(self.lwl, (-vBs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
+        lwls_C = lredshift(self.lwl, (-vCs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
 
         # fill out covariance matrix
-        lnp = covariance.lnlike_f_g_h(self.V11, wls_A.flatten(), wls_B.flatten(), wls_C.flatten(), self.fl, self.sigma, amp_f, l_f, amp_g, l_g, amp_h, l_h)
+        lnp = covariance.lnlike_f_g_h(self.V11, lwls_A.flatten(), lwls_B.flatten(), lwls_C.flatten(), self.fl, self.sigma, amp_f, l_f, amp_g, l_g, amp_h, l_h)
 
         if lnp == -np.inf and args.debug:
             self.logger.debug("Worker {} evaulated -np.inf".format(self.key))

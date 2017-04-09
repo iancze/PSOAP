@@ -67,6 +67,7 @@ for row in chunks:
 
     # Load the data
     wls = chunk.wl
+    lwls = chunk.lwls
     fl = chunk.fl
     sigma = chunk.sigma
     dates = chunk.date1D
@@ -84,9 +85,9 @@ for row in chunks:
     n_epochs, n_pix = wls_A.shape
 
     # First predict the component spectra as mean 1 GPs
-    mu, Sigma = covariance.predict_f_g_h(wls_A.flatten(), wls_B.flatten(), wls_C.flatten(), fl.flatten(), sigma.flatten(), wls_A.flatten(), wls_B.flatten(), wls_C.flatten(), mu_f=0.0, mu_g=0.0, mu_h=0.0, amp_f=amp_f, l_f=l_f, amp_g=amp_g, l_g=l_g, amp_h=amp_h, l_h=l_h)
+    mu, Sigma = covariance.predict_f_g_h(lwls_A.flatten(), lwls_B.flatten(), lwls_C.flatten(), fl.flatten(), sigma.flatten(), lwls_A.flatten(), lwls_B.flatten(), lwls_C.flatten(), mu_f=0.0, mu_g=0.0, mu_h=0.0, amp_f=amp_f, l_f=l_f, amp_g=amp_g, l_g=l_g, amp_h=amp_h, l_h=l_h)
 
-    mu_sum, Sigma_sum = covariance.predict_f_g_h_sum(wls_A.flatten(), wls_B.flatten(), wls_C.flatten(), fl.flatten(), sigma.flatten(), wls_A.flatten(), wls_B.flatten(), wls_C.flatten(), mu_fgh=1.0, amp_f=amp_f, l_f=l_f, amp_g=amp_g, l_g=l_g, amp_h=amp_h, l_h=l_h)
+    mu_sum, Sigma_sum = covariance.predict_f_g_h_sum(lwls_A.flatten(), lwls_B.flatten(), lwls_C.flatten(), fl.flatten(), sigma.flatten(), lwls_A.flatten(), lwls_B.flatten(), lwls_C.flatten(), mu_fgh=1.0, amp_f=amp_f, l_f=l_f, amp_g=amp_g, l_g=l_g, amp_h=amp_h, l_h=l_h)
 
     mu_f = mu[0:(n_pix * n_epochs)]
     mu_g = mu[(n_pix * n_epochs):2 * (n_pix * n_epochs)]

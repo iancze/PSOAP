@@ -19,6 +19,14 @@ def redshift(wl, v):
     wl_red = wl * np.sqrt((C.c_kms + v)/(C.c_kms - v))
     return wl_red
 
+def lredshift(lwl, v):
+    '''
+    Redshift spectra that are already in log-lambda. A positive velocity corresponds to a lengthing (increase) of the wavelengths of the array.
+    '''
+
+    lwl_red = lwl + v/C.c_kms
+    return lwl_red
+
 # Data structure for the LkCa14 and LkCa15 spectra
 class Spectrum:
     def __init__(self, fname):
