@@ -68,6 +68,7 @@ class Chunk:
     '''
     def __init__(self, wl, fl, sigma, date, mask=None):
         self.wl = wl
+        self.lwl = np.log(wl) # Natural log!
         self.fl = fl
         self.sigma = sigma
         self.date = date
@@ -84,6 +85,7 @@ class Chunk:
         Apply the mask to all of the attributes, so now we return 1D arrays.
         '''
         self.wl = self.wl[self.mask]
+        self.lwl = self.lwl[self.mask]
         self.fl = self.fl[self.mask]
         self.sigma = self.sigma[self.mask]
         self.date = self.date[self.mask]
@@ -138,4 +140,3 @@ class Chunk:
 # Load the HDF5 files into global scope
 basedir = os.path.dirname(inspect.getfile(psoap))
 lkca14 = Spectrum(basedir + "/../data/LkCa14.hdf5")
-gwori = Spectrum(basedir + "/../data/GWOri.hdf5")

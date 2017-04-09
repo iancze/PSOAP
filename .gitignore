@@ -6,6 +6,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+psoap/matrix_functions.c
 
 # C extensions
 *.so

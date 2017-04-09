@@ -5,7 +5,7 @@ import argparse
 parser = argparse.ArgumentParser(description="Measure statistics across multiple chains.")
 parser.add_argument("--draws", type=int, default=10, help="How many different orbital draws.")
 parser.add_argument("--burn", type=int, default=0, help="How many samples to discard from the beginning of the chain for burn in.")
-parser.add_argument("--thin", type=int, default=0, help="How many samples to skip (stride-wise) so to gain independent samples.")
+parser.add_argument("--thin", type=int, default=1, help="How many samples to skip (stride-wise) so to gain independent samples.")
 args = parser.parse_args()
 
 
@@ -136,6 +136,8 @@ if config["model"] == "SB1":
     # Save the velocities from a random draw.
     np.save("vA_model.npy", vAs)
 
+    fig.savefig("orbits.png", dpi=300)
+
 elif config["model"] == "SB2":
     fig, ax = plt.subplots(figsize=(8,5))
     ax.axhline(pars["gamma"], color="0.4", ls="-.")
@@ -151,7 +153,12 @@ elif config["model"] == "SB2":
     np.save("vA_model.npy", vAs)
     np.save("vB_model.npy", vBs)
 
+    fig.savefig("orbits.png", dpi=300)
+
 elif config["model"] == "ST3":
+
+    # Make a full orbital figure, then make two figures for sampling as a function of orbital phase
+
     fig, ax = plt.subplots(nrows=4, figsize=(8,5), sharex=True)
     ax[0].axhline(pars["gamma"], color="0.4", ls="-.")
 
@@ -197,8 +204,50 @@ elif config["model"] == "ST3":
     np.save("vB_model.npy", vBs)
     np.save("vC_model.npy", vCs)
 
+    fig.savefig("orbits.png", dpi=300)
+
+    # Now make the orbital phase plots
+
+
+    # Convert dates to orbital phase
+
+    fig, ax = plt.subplots(ncols=2, figsize=(8,6))
+
+    for p in flatchain:
+        vAs, vAs_fine, vBs, vBs_fine, vCs, vCs_fine = get_orbit_ST3(p)
+
+        q_in, K_in, e_in, omega_in, P_in, T0_in, q_out, K_out, e_out, omega_out, P_out, T0_out, gamma, amp_f, l_f, amp_g, l_g, amp_h, l_h = convert_vector_p(p)
+
+        phase_inner = (dates - T0_in) % P_in
+        phase_inner_fine = (dates_fine - T0_in) % P_in
+
+        phase_outer = (dates - T0_out) % P_out
+        phase_outer_fine = (dates_fine - T0_in) % P_out
+
+        # plot the outer orbit on the left
+        ax[0].plot(phase_outer_fine, vAs_fine, color="b", lw=0.5, alpha=0.3)
+        ax[0].plot(phase_outer_fine, vBs_fine, color="g", lw=0.5, alpha=0.3)
+        ax[0].plot(phase_outer_fine, vCs_fine, color="r", lw=0.5, alpha=0.3)
+        ax[0].plot(phase_outer, vAs, ".", color="b")
+        ax[0].plot(phase_outer, vBs, ".", color="g")
+        ax[0].plot(phase_outer, vCs, ".", color="r")
+
+        # plot the inner orbit on the right
+        ax[1].plot(phase_inner_fine, vAs_fine, color="b", lw=0.5, alpha=0.3)
+        ax[1].plot(phase_inner_fine, vBs_fine, color="g", lw=0.5, alpha=0.3)
+        ax[1].plot(phase_inner_fine, vCs_fine, color="r", lw=0.5, alpha=0.3)
+        ax[1].plot(phase_inner, vAs, ".", color="b")
+        ax[1].plot(phase_inner, vBs, ".", color="g")
+        ax[1].plot(phase_inner, vCs, ".", color="r")
+
+    ax[0].set_ylabel(r"$v$ [km/s]")
+    ax[1].set_ylabel(r"$v$ [km/s]")
+
+    ax[0].set_xlabel("outer phase")
+    ax[1].set_xlabel("inner phase")
+
+    fig.savefig("orbits_phase.png", dpi=300)
+
 
 else:
     print("model not implemented yet")
-
-fig.savefig("orbits.png", dpi=300)
