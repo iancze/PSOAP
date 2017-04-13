@@ -52,6 +52,10 @@ for chunk_index,chunk in enumerate(chunks):
     # print("date", date)
     date1D = chunk.date1D
 
+    print(wl.shape)
+    print(chunk.n_epochs)
+    print(fl_cor.shape)
+
     print("Plotting", order, wl0, wl1)
 
     # Make a figure comparing the optimization

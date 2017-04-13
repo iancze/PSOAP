@@ -287,9 +287,8 @@ class Worker:
         '''
         Wrap up the sampling and write the samples to disk.
         '''
-        if args.debug:
-            self.logger.debug("Finishing")
-
+        pass
+        
     def brain(self, conn):
         '''
         The infinite loop of the subprocess, which continues to listen for

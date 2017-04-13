@@ -9,6 +9,9 @@ from psoap import constants as C
 from psoap import matrix_functions
 from psoap.data import lredshift
 
+import celerite
+from celerite import terms
+
 
 def predict_f(lwl_known, fl_known, sigma_known, lwl_predict, amp_f, l_f, mu_GP=1.0):
 
@@ -363,30 +366,76 @@ def optimize_GP_f(wl_known, fl_known, sigma_known, amp_f, l_f, mu_GP=1.0):
 
     return ans["x"]
 
-def optimize_epoch_velocity(lwl_epoch, fl_epoch, sigma_epoch, lwl_fixed, fl_fixed, sigma_fixed, amp_f, l_f, mu_GP=1.0):
+def optimize_epoch_velocity_f(lwl_epoch, fl_epoch, sigma_epoch, lwl_fixed, fl_fixed, sigma_fixed, gp):
     '''
     Optimize the wavelengths of the chosen epoch relative to the fixed wavelengths. Identify the velocity required to redshift the chosen epoch.
     '''
 
+
     fl = np.concatenate((fl_epoch, fl_fixed)).flatten()
     sigma = np.concatenate((sigma_epoch, sigma_fixed)).flatten()
 
-    def func(v):
+    def func(p):
         try:
+            v, log_sigma, log_rho = p
+
+            if v < -200 or v > 200 or log_sigma < -3 or log_sigma > -2 or log_rho < -9 or log_rho > -8:
+                return -np.inf
+
             # Doppler shift the input wl_epoch
             lwl_shift = lredshift(lwl_epoch, v)
 
-            # Reconcatenate spectra into 1D array
+            # Reconcatenate spectra into 1D array and sort
             lwl = np.concatenate((lwl_shift, lwl_fixed)).flatten()
-            return -lnlike_GP(lwl, fl, sigma, amp_f, l_f, mu_GP)
+
+            indsort = np.argsort(lwl)
+
+            # Set the par vectors
+            gp.set_parameter_vector(p[1:])
+
+            # compute GP on new wl grid
+            gp.compute(lwl[indsort], yerr=sigma[indsort])
+            return -gp.log_likelihood(fl[indsort])
+
         except np.linalg.linalg.LinAlgError:
             return np.inf
 
-    ans = minimize(func, np.array([0.0]), method="Nelder-Mead")
+    # bound as -200 to 200 km/s
+    p0 = np.concatenate((np.array([0.0]), gp.get_parameter_vector()))
+    # bounds = [(-200, 200.)] + gp.get_parameter_bounds()
+    # print(bounds)
 
+    # ans = minimize(func, p0, method="L-BFGS-B", bounds=bounds)
+    ans = minimize(func, p0, method="Nelder-Mead")
     # The velocity returned is the amount that was required to redshift wl_epoch to line up with wl_fixed.
 
-    return ans["x"][0]
+    if ans["success"]:
+        print("Success found with", ans["x"])
+        return ans["x"][0]
+    else:
+        print(ans)
+        raise C.ChunkError("Unable to optimize velocity for epoch.")
+
+def determine_all_velocities(chunk, log_sigma, log_rho, mu_GP=1.0):
+    kernel = terms.Matern32Term(log_sigma=log_sigma, log_rho=log_rho)
+    gp = celerite.GP(kernel, mean=1.0, fit_mean=False)
+
+    lwl_fixed = chunk.lwl[0]
+    fl_fixed = chunk.fl[0]
+    sigma_fixed = chunk.sigma[0]
+
+    velocities = np.empty(chunk.n_epochs, dtype=np.float64)
+    velocities[0] = 0.0
+
+    for i in range(1, chunk.n_epochs):
+        try:
+            velocities[i] = optimize_epoch_velocity_f(chunk.lwl[i], chunk.fl[i], chunk.sigma[i], lwl_fixed, fl_fixed, sigma_fixed, gp)
+        except C.ChunkError as e:
+            print("Unable to optimize velocity for epoch {:}".format(chunk.date1D[i]))
+            velocities[i] = 0.0
+
+    return velocities
+
 
 # New (as of 4/4/17) routine to incorporate more complex covariance matrices in the optimization routine, which can incorporate orbital motion.
 

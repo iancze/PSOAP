@@ -16,7 +16,7 @@ from scipy.linalg import cho_factor, cho_solve
 from astropy.io import ascii
 
 from psoap import constants as C
-from psoap.data import redshift, Chunk
+from psoap.data import lredshift, Chunk
 from psoap import covariance
 from psoap import orbit
 from psoap import utils
@@ -67,7 +67,7 @@ for row in chunks:
 
     # Load the data
     wls = chunk.wl
-    lwls = chunk.lwls
+    lwls = chunk.lwl
     fl = chunk.fl
     sigma = chunk.sigma
     dates = chunk.date1D
@@ -78,11 +78,11 @@ for row in chunks:
     vAs, vBs, vCs = orb.get_component_velocities()
 
     # shift wavelengths according to these velocities to rest-frame of A component
-    wls_A = redshift(wls, -vAs[:,np.newaxis])
-    wls_B = redshift(wls, -vBs[:,np.newaxis])
-    wls_C = redshift(wls, -vCs[:,np.newaxis])
+    lwls_A = lredshift(lwls, -vAs[:,np.newaxis])
+    lwls_B = lredshift(lwls, -vBs[:,np.newaxis])
+    lwls_C = lredshift(lwls, -vCs[:,np.newaxis])
 
-    n_epochs, n_pix = wls_A.shape
+    n_epochs, n_pix = lwls_A.shape
 
     # First predict the component spectra as mean 1 GPs
     mu, Sigma = covariance.predict_f_g_h(lwls_A.flatten(), lwls_B.flatten(), lwls_C.flatten(), fl.flatten(), sigma.flatten(), lwls_A.flatten(), lwls_B.flatten(), lwls_C.flatten(), mu_f=0.0, mu_g=0.0, mu_h=0.0, amp_f=amp_f, l_f=l_f, amp_g=amp_g, l_g=l_g, amp_h=amp_h, l_h=l_h)

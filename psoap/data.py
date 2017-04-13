@@ -100,7 +100,7 @@ class Chunk:
         self.N = len(self.wl)
 
     @classmethod
-    def open(cls, order, wl0, wl1, limit=40, prefix=""):
+    def open(cls, order, wl0, wl1, limit=100, prefix=""):
         '''
         Load a spectrum from a directory link pointing to HDF5 output.
         :param fname: HDF5 file containing files on disk.
@@ -110,6 +110,10 @@ class Chunk:
         fname = prefix + C.chunk_fmt.format(order, wl0, wl1) + ".hdf5"
         import h5py
         with h5py.File(fname, "r") as hdf5:
+            wl = hdf5["wl"]
+            n_epochs = len(wl)
+            if limit > n_epochs:
+                limit = n_epochs
             wl = hdf5["wl"][:limit]
             fl = hdf5["fl"][:limit]
             sigma = hdf5["sigma"][:limit]
