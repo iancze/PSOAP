@@ -15,7 +15,7 @@ from astropy.io import ascii
 from scipy.linalg import cho_factor, cho_solve
 
 from psoap import constants as C
-from psoap.data import redshift, Chunk
+from psoap.data import lredshift, redshift, Chunk
 from psoap import covariance
 from psoap import orbit
 from psoap import utils

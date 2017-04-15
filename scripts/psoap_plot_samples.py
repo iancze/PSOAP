@@ -15,14 +15,33 @@ import matplotlib
 import matplotlib.pyplot as plt
 import psoap
 from psoap import utils
+from functools import partial
 
 # This first bit of code is run for every invocation of the script
 flatchain = np.load("flatchain.npy")
 flatchain = flatchain[args.burn:]
 np.save("flatchain_burned.npy", flatchain)
 
+
+# If we can tell what type of model we were sampling, we can give everything appropriate labels.
+import yaml
+f = open(args.config)
+config = yaml.load(f)
+f.close()
+
+model = config["model"]
+labels = utils.get_labels(model, config["fix_params"])
+
 print("Last sample is ")
-print(flatchain[-1])
+# print(flatchain[-1])
+
+# Rather than just plotting the last sample, it would be helpful to plot out an actually config.yaml file structure
+# that can be easily copied and pasted into the new file.
+convert_vector_p = partial(utils.convert_vector, model=config["model"], fix_params=config["fix_params"], **config["parameters"])
+reg_params = utils.registered_params[config["model"]]
+last_sample = convert_vector_p(flatchain[-1])
+for (name, sample) in zip(reg_params, last_sample):
+    print(name, ":", sample)
 
 # Load the lnprobabilities and truncate for burn in
 try:
@@ -38,14 +57,7 @@ if args.cov:
     cov = utils.estimate_covariance(flatchain)
     np.save("opt_jump.npy", cov)
 
-# If we can tell what type of model we were sampling, we can give everything appropriate labels.
-import yaml
-f = open(args.config)
-config = yaml.load(f)
-f.close()
 
-model = config["model"]
-labels = utils.get_labels(model, config["fix_params"])
 
 
 fig, ax = plt.subplots(nrows=(ndim + 1), ncols=1, figsize=(10, 1.5 * ndim))

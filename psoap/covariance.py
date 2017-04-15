@@ -283,11 +283,23 @@ def predict_f_g_h_sum(lwl_f, lwl_g, lwl_h, fl_fgh, sigma_fgh, lwl_f_predict, lwl
     return mu, Sigma
 
 def lnlike_f(V11, wl_f, fl, sigma, amp_f, l_f, mu_GP=1.):
-    '''
-    V11 is a matrix to be allocated.
-    wl_known, fl_known, and sigma_known are flattened 1D arrays.
+    """Calculate the log-likelihood for a single-lined spectrum.
 
-    '''
+    This function takes a pre-allocated array and fills out the covariance matrices and evaluates the likelihood function for a single-lined spectrum, assuming a squared-exponential kernel (does not ``celerite``).
+
+    Args:
+        V11 (numpy 2D array): Description of arg1
+        wl_f (numpy 1D array): Description of arg2
+        fl (numpy 1D array): ae
+        amp_f (float) : amplitude of GP
+        l_f (float) : length scale of GP
+        mu_GP (float) : mean of GP
+
+    Returns:
+        float: The log-likelihood value
+
+    """
+
     if  amp_f < 0.0 or l_f < 0.0:
         return -np.inf
 

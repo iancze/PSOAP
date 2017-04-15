@@ -3,6 +3,7 @@ import numpy as np
 # A dictionary of parameter lists for conversion.
 registered_params = {"SB1": ["K", "e", "omega", "P", "T0", "gamma", "amp_f", "l_f"],
 "SB2": ["q", "K", "e", "omega", "P", "T0", "gamma", "amp_f", "l_f", "amp_g", "l_g"],
+"ST1": ["K_in", "e_in", "omega_in", "P_in", "T0_in", "K_out", "e_out", "omega_out", "P_out", "T0_out", "gamma", "amp_f", "l_f"],
 "ST3": ["q_in", "K_in", "e_in", "omega_in", "P_in", "T0_in", "q_out", "K_out", "e_out", "omega_out", "P_out", "T0_out", "gamma", "amp_f", "l_f", "amp_g", "l_g", "amp_h", "l_h"]}
 
 registered_labels = {"SB1": [r"$K$", r"$e$", r"$\omega$", r"$P$", r"$T_0$", r"$\gamma$", r"$a_f$", r"$l_f$"],
