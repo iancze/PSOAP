@@ -27,11 +27,19 @@ def lredshift(lwl, v):
     lwl_red = lwl + v/C.c_kms
     return lwl_red
 
-# Data structure for the LkCa14 and LkCa15 spectra
+
 class Spectrum:
     def __init__(self, fname):
         '''
-        Load a spectrum from HDF5 file.
+        Data structure for the raw spectra, stored in an HDF5 file.
+
+        This is the main datastructure used to interact with your dataset. The key is getting your spectra into an HDF5 format first.
+
+        Args:
+            fname (string): location of the HDF5 file.
+
+        Returns:
+            Spectrum: the Spectrum object.
         '''
 
         data = h5py.File(fname,'r')
@@ -53,8 +61,11 @@ class Spectrum:
 
     def sort_by_SN(self, order=22):
         '''
-        Call this function to reorder all spectra from higest to lowest S/N.
-        Optionally provide the order that should be used to determine the S/N.
+        Sort the dataset in order of decreasing signal to noise. This is designed to make it easy to limit the analysis to the highest SNR epochs, if you wish to speed things up.
+
+        Args:
+            order (int): the order to calculate the signal-to-noise. By default, the TRES Mg b order is chosen, which is generally a good order for TRES data. If you are using data from a different telescope, you will likely need to adjust this value.
+
         '''
 
         # Since all spectra have been pre-normalized to 1.0, this is equivalent to simply finding
