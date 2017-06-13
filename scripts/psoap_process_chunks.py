@@ -32,7 +32,7 @@ print(chunks)
 # read in the actual dataset
 dataset = Spectrum(config["data_file"])
 # sort by signal-to-noise
-dataset.sort_by_SN()
+dataset.sort_by_SN(config.get("snr_order", C.snr_default))
 
 # limit?
 limit = config["epoch_limit"]

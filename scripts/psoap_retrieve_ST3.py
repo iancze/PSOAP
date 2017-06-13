@@ -108,10 +108,16 @@ def process_chunk(row):
 
     mu, Sigma = covariance.predict_f_g_h(lwls_A.flatten(), lwls_B.flatten(), lwls_C.flatten(), fl.flatten(), sigma.flatten(), lwls_A_predict, lwls_B_predict, lwls_C_predict, mu_f=0.0, mu_g=0.0, mu_h=0.0, amp_f=amp_f, l_f=l_f, amp_g=amp_g, l_g=l_g, amp_h=amp_h, l_h=l_h)
 
+    sigma_diag = np.sqrt(np.diag(Sigma))
 
     mu_f = mu[0:n_pix_predict]
+    sigma_f = sigma_diag[0:n_pix_predict]
+
     mu_g = mu[n_pix_predict:2 * n_pix_predict]
+    sigma_g = sigma_diag[n_pix_predict: 2 * n_pix_predict]
+
     mu_h = mu[2 * n_pix_predict:]
+    sigma_h = sigma_diag[2 * n_pix_predict:]
 
 
     fig, ax = plt.subplots(nrows=3, sharex=True)
@@ -131,9 +137,9 @@ def process_chunk(row):
     fig.savefig(plots_dir + "/reconstructed.png", dpi=300)
     plt.close("all")
 
-    np.save(plots_dir + "/f.npy", np.vstack((wls_A_predict, mu_f)))
-    np.save(plots_dir + "/g.npy", np.vstack((wls_B_predict, mu_g)))
-    np.save(plots_dir + "/h.npy", np.vstack((wls_C_predict, mu_h)))
+    np.save(plots_dir + "/f.npy", np.vstack((wls_A_predict, mu_f, sigma_f)))
+    np.save(plots_dir + "/g.npy", np.vstack((wls_B_predict, mu_g, sigma_g)))
+    np.save(plots_dir + "/h.npy", np.vstack((wls_C_predict, mu_h, sigma_h)))
 
     np.save(plots_dir + "/mu.npy", mu)
     np.save(plots_dir + "/Sigma.npy", Sigma)

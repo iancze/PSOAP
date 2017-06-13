@@ -32,6 +32,9 @@ F_sun = L_sun / (4 * np.pi * R_sun ** 2) #bolometric flux of the Sun measured at
 
 chunk_fmt = "chunk_{:}_{:.0f}_{:.0f}" # order, wl0, wl1
 
+# Default order used to estimate SNR, indexed from 0
+snr_default = 22
+
 class ChunkError(Exception):
     '''
     Raised when there was a problem evaluating a specific chunk.

@@ -75,7 +75,7 @@ def get_orbit_SB2(p):
     # unroll p
     q, K, e, omega, P, T0, gamma, amp_f, l_f, amp_g, l_g = convert_vector_p(p)
 
-    if q < 0.0 or q > 1.0 or K < 0.0 or e < 0.0 or e > 1.0 or P < 0.0 or omega < -180 or omega > 520 or amp_f < 0.0 or l_f < 0.0:
+    if q < 0.0 or K < 0.0 or e < 0.0 or e > 1.0 or P < 0.0 or omega < -180 or omega > 520 or amp_f < 0.0 or l_f < 0.0 or amp_g < 0.0 or l_g < 0.0 :
         raise RuntimeError
 
     # Update the orbit
@@ -153,7 +153,39 @@ elif config["model"] == "SB2":
     np.save("vA_model.npy", vAs)
     np.save("vB_model.npy", vBs)
 
+    ax.set_xlabel("Julian Date")
+
     fig.savefig("orbits.png", dpi=300)
+
+    # Now make an orbital phase plot
+    fig, ax = plt.subplots(figsize=(8,5))
+    ax.axhline(pars["gamma"], color="0.4", ls="-.")
+
+    for p in flatchain:
+        vAs, vAs_fine, vBs, vBs_fine = get_orbit_SB2(p)
+        q, K, e, omega, P, T0, gamma, amp_f, l_f, amp_g, l_g = convert_vector_p(p)
+
+        phase = ((dates - T0) % P) / P
+        phase_fine = ((dates_fine - T0) % P) / P
+
+        indsort = np.argsort(phase)
+        phase = phase[indsort]
+        vAs = vAs[indsort]
+        vBs = vBs[indsort]
+
+        indsort = np.argsort(phase_fine)
+        phase_fine = phase_fine[indsort]
+        vAs_fine = vAs_fine[indsort]
+        vBs_fine = vBs_fine[indsort]
+
+
+        ax.plot(phase_fine, vAs_fine, color="b", lw=0.5, alpha=0.3)
+        ax.plot(phase_fine, vBs_fine, color="g", lw=0.5, alpha=0.3)
+        ax.plot(phase, vAs, ".", color="b")
+        ax.plot(phase, vBs, ".", color="g")
+
+    ax.set_xlabel(r"$\phi$")
+    fig.savefig("orbits_phase.png", dpi=300)
 
 elif config["model"] == "ST3":
 

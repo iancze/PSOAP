@@ -46,7 +46,7 @@ if not os.path.exists(plot_dir_base):
 
 # Sort the spectra by SNR if we want
 if args.SNR:
-    spectrum.sort_by_SN()
+    spectrum.sort_by_SN(config.get("snr_order", C.snr_default))
 
 # Read the important quantities
 wls = spectrum.wl
@@ -83,11 +83,19 @@ for order in orders:
     # calculate max and min wl for this order
     wl_min = np.min(wls[:,order])
     wl_max = np.max(wls[:,order])
+    fl_min = np.min(fls[:,order])
+    fl_max = np.max(fls[:,order])
     wl_range = (wl_max - wl_min)
+    fl_range = (fl_max - fl_min)
+
+
     x0 = wl_min - 0.09 * wl_range
     x0_annotate = wl_min - 0.045 * wl_range
     x1 = wl_max + 0.09 * wl_range
     x1_annotate = wl_max + 0.045 * wl_range
+
+    y0 = fl_min - 0.09 * fl_range
+    y1 = fl_max + 0.09 * fl_range
 
     fig, ax = plt.subplots(figsize=(10.0, n_epochs * dy_per_epoch))
 
@@ -120,6 +128,7 @@ for order in orders:
         fig, ax = plt.subplots(figsize=(10,8))
         ax.plot(wls[i,order,:], fls[i,order,:], color="k")
         ax.set_xlim(x0, x1)
+        ax.set_ylim(y0, y1)
         ax.annotate("JD - 2,400,000\n{:.1f}".format(dates[i] - 2400000), (x0_annotate, 1.0), color='k', ha="center", va="center", size=8)
         ax.annotate("SNR\n{:.0f}".format(SNR), (x1_annotate, 1.0), color='k', ha="center", va="center", size=8)
 

@@ -48,8 +48,9 @@ except FileNotFoundError as e:
 # Load the HDF5 file
 # read in the actual dataset
 dataset = Spectrum(config["data_file"])
+
 # sort by signal-to-noise
-dataset.sort_by_SN()
+dataset.sort_by_SN(config.get("snr_order", C.snr_default))
 
 n_epochs, n_orders, n_pix = dataset.wl.shape
 

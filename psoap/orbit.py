@@ -7,68 +7,20 @@ from psoap import constants as C
 
 class SB1:
     '''
-    Describing a single-line Spectroscopic binary.
+    Describing a single-line Spectroscopici binary.
     '''
     def __init__(self, K, e, omega, P, T0, gamma, obs_dates=None, **kwargs):
-        self._K = K # [km/s]
-        self._e = e
-        self._omega = omega # [deg]
-        self._P = P # [days]
-        self._T0 = T0 # [JD]
-        self._gamma = gamma # [km/s]
+        self.K = K # [km/s]
+        self.e = e
+        self.omega = omega # [deg]
+        self.P = P # [days]
+        self.T0 = T0 # [JD]
+        self.gamma = gamma # [km/s]
 
         # If we are going to be repeatedly predicting the orbit at a sequence of dates,
         # just store them to the object.
         self.obs_dates = obs_dates
 
-    # Properties so that we can easily update subsets of the orbit.
-    @property
-    def K(self):
-        return self._K
-
-    @K.setter
-    def K(self, value):
-        self._K = value
-
-    @property
-    def e(self):
-        return self._e
-
-    @e.setter
-    def e(self, value):
-        self._e = value
-
-    @property
-    def omega(self):
-        return self._omega
-
-    @omega.setter
-    def omega(self, value):
-        self._omega = value
-
-    @property
-    def P(self):
-        return self._P
-
-    @P.setter
-    def P(self, value):
-        self._P = value
-
-    @property
-    def T0(self):
-        return self._T0
-
-    @T0.setter
-    def T0(self, value):
-        self._T0 = value
-
-    @property
-    def gamma(self):
-        return self._gamma
-
-    @gamma.setter
-    def gamma(self, value):
-        self._gamma = value
 
     def theta(self, t):
         '''Calculate the true anomoly for the A-B orbit.
@@ -77,14 +29,14 @@ class SB1:
         # t is input in seconds
 
         # Take a modulus of the period
-        t = (t - self._T0) % self._P
+        t = (t - self.T0) % self.P
 
-        f = lambda E: E - self._e * np.sin(E) - 2 * np.pi * t/self._P
-        E0 = 2 * np.pi * t / self._P
+        f = lambda E: E - self.e * np.sin(E) - 2 * np.pi * t/self.P
+        E0 = 2 * np.pi * t / self.P
 
         E = fsolve(f, E0)[0]
 
-        th = 2 * np.arctan(np.sqrt((1 + self._e)/(1 - self._e)) * np.tan(E/2.))
+        th = 2 * np.arctan(np.sqrt((1 + self.e)/(1 - self.e)) * np.tan(E/2.))
 
         if E < np.pi:
             return th
@@ -95,7 +47,7 @@ class SB1:
         '''Calculate the component of A's velocity based on only the inner orbit.
         f is the true anomoly of this inner orbit.'''
 
-        return self._K * (np.cos(self._omega * np.pi/180 + f) + self._e * np.cos(self._omega * np.pi/180))
+        return self.K * (np.cos(self.omega * np.pi/180 + f) + self.e * np.cos(self.omega * np.pi/180))
 
     def vA_t(self, t):
         '''
@@ -105,7 +57,7 @@ class SB1:
         f = self.theta(t)
 
         # Feed this into the orbit equation and add the systemic velocity
-        return self.v1_f(f) + self._gamma
+        return self.v1_f(f) + self.gamma
 
 
     def get_component_velocities(self, dates=None):
@@ -131,27 +83,19 @@ class SB2(SB1):
     '''
     def __init__(self, q, K, e, omega, P, T0, gamma, obs_dates=None, **kwargs):
         super().__init__(K, e, omega, P, T0, gamma, obs_dates=obs_dates, **kwargs)
-        self._q = q
-
-    @property
-    def q(self):
-        return self._q
-
-    @q.setter
-    def q(self, value):
-        self._q = value
+        self.q = q
 
     def v2_f(self, f):
         '''Calculate the component of B's velocity based on only the inner orbit.
         f is the true anomoly of this inner orbit.'''
 
-        return -self._K/self._q * (np.cos(self._omega * np.pi/180 + f) + self._e * np.cos(self._omega * np.pi/180))
+        return -self.K/self.q * (np.cos(self.omega * np.pi/180 + f) + self.e * np.cos(self.omega * np.pi/180))
 
     def vB_t(self, t):
         f = self.theta(t)
 
         # Feed this into the orbit equation and add the systemic velocity
-        return self.v2_f(f) + self._gamma
+        return self.v2_f(f) + self.gamma
 
     def get_component_velocities(self, dates=None):
         '''
@@ -176,110 +120,21 @@ class ST1:
     A hierarchical triple star orbit for which we only see the primary lines.
     '''
     def __init__(self, K_in, e_in, omega_in, P_in, T0_in, K_out, e_out, omega_out, P_out, T0_out, gamma, obs_dates=None, **kwargs):
-        self._K_in = K_in # [km/s]
-        self._e_in = e_in
-        self._omega_in = omega_in # [deg]
-        self._P_in = P_in # [days]
-        self._T0_in = T0_in # [JD]
-        self._K_out = K_out # [km/s]
-        self._e_out = e_out
-        self._omega_out = omega_out # [deg]
-        self._P_out = P_out # [days]
-        self._T0_out = T0_out # [JD]
-        self._gamma = gamma # [km/s]
+        self.K_in = K_in # [km/s]
+        self.e_in = e_in
+        self.omega_in = omega_in # [deg]
+        self.P_in = P_in # [days]
+        self.T0_in = T0_in # [JD]
+        self.K_out = K_out # [km/s]
+        self.e_out = e_out
+        self.omega_out = omega_out # [deg]
+        self.P_out = P_out # [days]
+        self.T0_out = T0_out # [JD]
+        self.gamma = gamma # [km/s]
 
         # If we are going to be repeatedly predicting the orbit at a sequence of dates,
         # just store them to the object.
         self.obs_dates = obs_dates
-
-    # Properties so that we can easily update subsets of the orbit.
-    @property
-    def K_in(self):
-        return self._K_in
-
-    @K_in.setter
-    def K_in(self, value):
-        self._K_in = value
-
-    @property
-    def e_in(self):
-        return self._e_in
-
-    @e_in.setter
-    def e_in(self, value):
-        self._e_in = value
-
-    @property
-    def omega_in(self):
-        return self._omega_in
-
-    @omega_in.setter
-    def omega_in(self, value):
-        self._omega_in = value
-
-    @property
-    def P_in(self):
-        return self._P_in
-
-    @P_in.setter
-    def P_in(self, value):
-        self._P_in = value
-
-    @property
-    def T0_in(self):
-        return self._T0_in
-
-    @T0_in.setter
-    def T0_in(self, value):
-        self._T0_in = value
-
-    @property
-    def K_out(self):
-        return self._K_out
-
-    @K_out.setter
-    def K_out(self, value):
-        self._K_out = value
-
-    @property
-    def e_out(self):
-        return self._e_out
-
-    @e_out.setter
-    def e_out(self, value):
-        self._e_out = value
-
-    @property
-    def omega_out(self):
-        return self._omega_out
-
-    @omega_out.setter
-    def omega_out(self, value):
-        self._omega_out = value
-
-    @property
-    def P_out(self):
-        return self._P_out
-
-    @P_out.setter
-    def P_out(self, value):
-        self._P_out = value
-
-    @property
-    def T0_out(self):
-        return self._T0_out
-
-    @T0_out.setter
-    def T0_out(self, value):
-        self._T0_out = value
-
-    @property
-    def gamma(self):
-        return self._gamma
-
-    @gamma.setter
-    def gamma(self, value):
-        self._gamma = value
 
     def theta_in(self, t):
         '''Calculate the true anomoly for the A-B orbit.'''
@@ -287,14 +142,14 @@ class ST1:
         # t is input in seconds
 
         # Take a modulus of the period
-        t = (t - self._T0_in) % self._P_in
+        t = (t - self.T0_in) % self.P_in
 
-        f = lambda E: E - self._e_in * np.sin(E) - 2 * np.pi * t/self._P_in
-        E0 = 2 * np.pi * t / self._P_in
+        f = lambda E: E - self.e_in * np.sin(E) - 2 * np.pi * t/self.P_in
+        E0 = 2 * np.pi * t / self.P_in
 
         E = fsolve(f, E0)[0]
 
-        th = 2 * np.arctan(np.sqrt((1 + self._e_in)/(1 - self._e_in)) * np.tan(E/2.))
+        th = 2 * np.arctan(np.sqrt((1 + self.e_in)/(1 - self.e_in)) * np.tan(E/2.))
 
         if E < np.pi:
             return th
@@ -307,14 +162,14 @@ class ST1:
         # t is input in seconds
 
         # Take a modulus of the period
-        t = (t - self._T0_out) % self._P_out
+        t = (t - self.T0_out) % self.P_out
 
-        f = lambda E: E - self._e_out * np.sin(E) - 2 * np.pi * t/self._P_out
-        E0 = 2 * np.pi * t / self._P_out
+        f = lambda E: E - self.e_out * np.sin(E) - 2 * np.pi * t/self.P_out
+        E0 = 2 * np.pi * t / self.P_out
 
         E = fsolve(f, E0)[0]
 
-        th = 2 * np.arctan(np.sqrt((1 + self._e_out)/(1 - self._e_out)) * np.tan(E/2.))
+        th = 2 * np.arctan(np.sqrt((1 + self.e_out)/(1 - self.e_out)) * np.tan(E/2.))
 
         if E < np.pi:
             return th
@@ -325,14 +180,13 @@ class ST1:
         '''Calculate the component of A's velocity based on only the inner orbit.
         f is the true anomoly of this inner orbit.'''
 
-        return self._K_in * (np.cos(self._omega_in * np.pi/180 + f) + self._e_in * np.cos(self._omega_in * np.pi/180))
+        return self.K_in * (np.cos(self.omega_in * np.pi/180 + f) + self.e_in * np.cos(self.omega_in * np.pi/180))
 
 
     def v3_f(self, f):
         '''Calculate the velocity of (A-B) based only on the outer orbit.
         f is the true anomoly of the outer orbit'''
-        return  self._K_out * (np.cos(self._omega_out * np.pi/180 + f) + self._e_out * np.cos(self._omega_out * np.pi/180))
-
+        return  self.K_out * (np.cos(self.omega_out * np.pi/180 + f) + self.e_out * np.cos(self.omega_out * np.pi/180))
 
 
     def vA_t(self, t):
@@ -371,38 +225,21 @@ class ST3(ST1):
     def __init__(self, q_in, K_in, e_in, omega_in, P_in, T0_in, q_out, K_out, e_out, omega_out, P_out, T0_out, gamma, obs_dates=None, **kwargs):
         super().__init__(K_in, e_in, omega_in, P_in, T0_in, K_out, e_out, omega_out, P_out, T0_out, gamma, obs_dates=obs_dates, **kwargs)
 
-        self._q_in = q_in # [M2/M1]
-        self._q_out = q_out # [M2/M1]
-
-    # Properties so that we can easily update subsets of the orbit.
-    @property
-    def q_in(self):
-        return self._q_in
-
-    @q_in.setter
-    def q_in(self, value):
-        self._q_in = value
-
-    @property
-    def q_out(self):
-        return self._q_out
-
-    @q_out.setter
-    def q_out(self, value):
-        self._q_out = value
+        self.q_in = q_in # [M2/M1]
+        self.q_out = q_out # [M2/M1]
 
     def v2_f(self, f):
         '''Calculate the component of B's velocity based on only the inner orbit.
         f is the true anomoly of this inner orbit.'''
 
-        return -self._K_in/self._q_in * (np.cos(self._omega_in * np.pi/180 + f) + self._e_in * np.cos(self._omega_in * np.pi/180))
+        return -self.K_in/self.q_in * (np.cos(self.omega_in * np.pi/180 + f) + self.e_in * np.cos(self.omega_in * np.pi/180))
 
 
     def v3_f_C(self, f):
         '''Calculate the velocity of C based only on the outer orbit.
         f is the true anomoly of the outer orbit
         '''
-        return -self._K_out / self._q_out * (np.cos(self._omega_out * np.pi/180 + f) + self._e_out * np.cos(self._omega_out * np.pi/180))
+        return -self.K_out / self.q_out * (np.cos(self.omega_out * np.pi/180 + f) + self.e_out * np.cos(self.omega_out * np.pi/180))
 
 
     def vB_t(self, t):

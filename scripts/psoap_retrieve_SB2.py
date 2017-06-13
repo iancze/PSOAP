@@ -104,8 +104,12 @@ def process_chunk(row):
 
     mu, Sigma = covariance.predict_f_g(lwls_A.flatten(), lwls_B.flatten(), fl.flatten(), sigma.flatten(), lwls_A_predict, lwls_B_predict, mu_f=0.0, mu_g=0.0, amp_f=amp_f, l_f=l_f, amp_g=amp_g, l_g=l_g)
 
+    sigma_diag = np.sqrt(np.diag(Sigma))
+
     mu_f = mu[0:n_pix_predict]
+    sigma_f = sigma_diag[0:n_pix_predict]
     mu_g = mu[n_pix_predict:]
+    sigma_g = sigma_diag[n_pix_predict:]
 
 
     # Make some multivariate draws
@@ -147,8 +151,9 @@ def process_chunk(row):
     fig.savefig(plots_dir + "/reconstructed.png", dpi=300)
     plt.close("all")
 
-    np.save(plots_dir + "/f.npy", np.vstack((wls_A_predict, mu_f)))
-    np.save(plots_dir + "/g.npy", np.vstack((wls_B_predict, mu_g)))
+    np.save(plots_dir + "/f.npy", np.vstack((wls_A_predict, mu_f, sigma_f)))
+
+    np.save(plots_dir + "/g.npy", np.vstack((wls_B_predict, mu_g, sigma_g)))
 
     np.save(plots_dir + "/mu.npy", mu)
     np.save(plots_dir + "/Sigma.npy", Sigma)

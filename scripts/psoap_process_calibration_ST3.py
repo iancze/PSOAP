@@ -71,6 +71,8 @@ for chunk_index,chunk in enumerate(chunks):
         continue
 
     order, wl0, wl1 = chunk
+    lwl0 = np.log(wl0)
+    lwl1 = np.log(wl1)
     chunk = Chunk.open(order, wl0, wl1)
     print("Optimizing", order, wl0, wl1)
 
