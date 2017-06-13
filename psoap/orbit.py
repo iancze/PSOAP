@@ -1,13 +1,10 @@
 import numpy as np
-from scipy.optimize import fsolve, minimize
+from scipy.optimize import fsolve
 
-from psoap import constants as C
-
-# Because of the way orbital models work, when there are additional spectroscopic signatures (e.g., `2` instead of `1`) there additional orbital parameters that we can constrain. For this reason, the `1` models form the base class and then the other models inherit the basic framework, adding on extra parameters for the new light components.
 
 class SB1:
     '''
-    Describing a single-line Spectroscopici binary.
+    Describing a single-line Spectroscopic binary.
     '''
     def __init__(self, K, e, omega, P, T0, gamma, obs_dates=None, **kwargs):
         self.K = K # [km/s]
@@ -22,7 +19,7 @@ class SB1:
         self.obs_dates = obs_dates
 
 
-    def theta(self, t):
+    def _theta(self, t):
         '''Calculate the true anomoly for the A-B orbit.
         Input is in days.'''
 
@@ -43,26 +40,26 @@ class SB1:
         else:
             return th + 2 * np.pi
 
-    def v1_f(self, f):
+    def _v1_f(self, f):
         '''Calculate the component of A's velocity based on only the inner orbit.
         f is the true anomoly of this inner orbit.'''
 
         return self.K * (np.cos(self.omega * np.pi/180 + f) + self.e * np.cos(self.omega * np.pi/180))
 
-    def vA_t(self, t):
+    def _vA_t(self, t):
         '''
 
         '''
         # Get the true anomoly "f" from time
-        f = self.theta(t)
+        f = self._theta(t)
 
         # Feed this into the orbit equation and add the systemic velocity
-        return self.v1_f(f) + self.gamma
+        return self._v1_f(f) + self.gamma
 
 
-    def get_component_velocities(self, dates=None):
+    def get_velocities(self, dates=None):
         '''
-        Return both vA and vB for all dates provided.
+        Return vA for all dates provided.
         '''
 
         if dates is None and self.obs_dates is None:
@@ -73,9 +70,9 @@ class SB1:
 
         dates = np.atleast_1d(dates)
 
-        vAs = np.array([self.vA_t(date) for date in dates])
+        vAs = np.array([self._vA_t(date) for date in dates])
 
-        return vAs
+        return np.atleast_2d(vAs)
 
 class SB2(SB1):
     '''
@@ -85,19 +82,19 @@ class SB2(SB1):
         super().__init__(K, e, omega, P, T0, gamma, obs_dates=obs_dates, **kwargs)
         self.q = q
 
-    def v2_f(self, f):
+    def _v2_f(self, f):
         '''Calculate the component of B's velocity based on only the inner orbit.
         f is the true anomoly of this inner orbit.'''
 
         return -self.K/self.q * (np.cos(self.omega * np.pi/180 + f) + self.e * np.cos(self.omega * np.pi/180))
 
-    def vB_t(self, t):
-        f = self.theta(t)
+    def _vB_t(self, t):
+        f = self._theta(t)
 
         # Feed this into the orbit equation and add the systemic velocity
-        return self.v2_f(f) + self.gamma
+        return self._v2_f(f) + self.gamma
 
-    def get_component_velocities(self, dates=None):
+    def get_velocities(self, dates=None):
         '''
         Return both vA and vB for all dates provided.
         '''
@@ -110,8 +107,8 @@ class SB2(SB1):
 
         dates = np.atleast_1d(dates)
 
-        vAs = np.array([self.vA_t(date) for date in dates])
-        vBs = np.array([self.vB_t(date) for date in dates])
+        vAs = np.array([self._vA_t(date) for date in dates])
+        vBs = np.array([self._vB_t(date) for date in dates])
 
         return (vAs, vBs)
 
@@ -136,7 +133,7 @@ class ST1:
         # just store them to the object.
         self.obs_dates = obs_dates
 
-    def theta_in(self, t):
+    def _theta_in(self, t):
         '''Calculate the true anomoly for the A-B orbit.'''
 
         # t is input in seconds
@@ -156,7 +153,7 @@ class ST1:
         else:
             return th + 2 * np.pi
 
-    def theta_out(self, t):
+    def _theta_out(self, t):
         '''Calculate the true anomoly for the (A-B) - C orbit.'''
 
         # t is input in seconds
@@ -176,31 +173,31 @@ class ST1:
         else:
             return th + 2 * np.pi
 
-    def v1_f(self, f):
+    def _v1_f(self, f):
         '''Calculate the component of A's velocity based on only the inner orbit.
         f is the true anomoly of this inner orbit.'''
 
         return self.K_in * (np.cos(self.omega_in * np.pi/180 + f) + self.e_in * np.cos(self.omega_in * np.pi/180))
 
 
-    def v3_f(self, f):
+    def _v3_f(self, f):
         '''Calculate the velocity of (A-B) based only on the outer orbit.
         f is the true anomoly of the outer orbit'''
         return  self.K_out * (np.cos(self.omega_out * np.pi/180 + f) + self.e_out * np.cos(self.omega_out * np.pi/180))
 
 
-    def vA_t(self, t):
+    def _vA_t(self, t):
 
         # Get the true anomoly "f" from time
-        f_in = self.theta_in(t)
-        f_out = self.theta_out(t)
+        f_in = self._theta_in(t)
+        f_out = self._theta_out(t)
 
-        v1 = self.v1_f(f_in)
-        v3 = self.v3_f(f_out)
+        v1 = self._v1_f(f_in)
+        v3 = self._v3_f(f_out)
 
         return v1 + v3 + self.gamma
 
-    def get_component_velocities(self, dates=None):
+    def get_velocities(self, dates=None):
         '''
         Return vA for all dates provided.
         '''
@@ -213,57 +210,83 @@ class ST1:
 
         dates = np.atleast_1d(dates)
 
-        vAs = np.array([self.vA_t(date) for date in dates])
+        vAs = np.array([self._vA_t(date) for date in dates])
 
-        return vAs
+        return np.atleast_2d(vAs)
 
-
-class ST3(ST1):
+class ST2(ST1):
     '''
-    Techniques describing solving for a triple star orbit for which we see all lines.
+    Solving a triple star orbit for which we see both sets of lines of the inner binary.
     '''
-    def __init__(self, q_in, K_in, e_in, omega_in, P_in, T0_in, q_out, K_out, e_out, omega_out, P_out, T0_out, gamma, obs_dates=None, **kwargs):
+    def __init__(self, q_in, K_in, e_in, omega_in, P_in, T0_in, K_out, e_out, omega_out, P_out, T0_out, gamma, obs_dates=None, **kwargs):
         super().__init__(K_in, e_in, omega_in, P_in, T0_in, K_out, e_out, omega_out, P_out, T0_out, gamma, obs_dates=obs_dates, **kwargs)
 
         self.q_in = q_in # [M2/M1]
-        self.q_out = q_out # [M2/M1]
 
-    def v2_f(self, f):
+    def _v2_f(self, f):
         '''Calculate the component of B's velocity based on only the inner orbit.
         f is the true anomoly of this inner orbit.'''
 
         return -self.K_in/self.q_in * (np.cos(self.omega_in * np.pi/180 + f) + self.e_in * np.cos(self.omega_in * np.pi/180))
 
+    def _vB_t(self, t):
 
-    def v3_f_C(self, f):
+        # Get the true anolomy "f" from time
+        f_in = self._theta_in(t)
+        f_out = self._theta_out(t)
+
+        v2 = self._v2_f(f_in)
+        v3 = self._v3_f(f_out)
+
+        return v2 + v3 + self.gamma
+
+    def get_velocities(self, dates=None):
+        '''
+        Return vA and vB for all dates provided.
+        '''
+
+        if dates is None and self.obs_dates is None:
+            raise RuntimeError("Must provide input dates or specify observation dates upon creation of orbit object.")
+
+        if dates is None and self.obs_dates is not None:
+            dates = self.obs_dates
+
+        dates = np.atleast_1d(dates)
+
+
+        vAs = np.array([self._vA_t(date) for date in dates])
+        vBs = np.array([self._vB_t(date) for date in dates])
+
+        return (vAs, vBs)
+
+
+class ST3(ST2):
+    '''
+    Techniques describing solving for a triple star orbit for which we see all lines.
+    '''
+    def __init__(self, q_in, K_in, e_in, omega_in, P_in, T0_in, q_out, K_out, e_out, omega_out, P_out, T0_out, gamma, obs_dates=None, **kwargs):
+        super().__init__(q_in, K_in, e_in, omega_in, P_in, T0_in, K_out, e_out, omega_out, P_out, T0_out, gamma, obs_dates=obs_dates, **kwargs)
+
+        self.q_out = q_out # [M2/M1]
+
+    def _v3_f_C(self, f):
         '''Calculate the velocity of C based only on the outer orbit.
         f is the true anomoly of the outer orbit
         '''
         return -self.K_out / self.q_out * (np.cos(self.omega_out * np.pi/180 + f) + self.e_out * np.cos(self.omega_out * np.pi/180))
 
 
-    def vB_t(self, t):
+    def _vC_t(self, t):
 
         # Get the true anolomy "f" from time
-        f_in = self.theta_in(t)
-        f_out = self.theta_out(t)
+        f_out = self._theta_out(t)
 
-        v2 = self.v2_f(f_in)
-        v3 = self.v3_f(f_out)
-
-        return v2 + v3 + self.gamma
-
-    def vC_t(self, t):
-
-        # Get the true anolomy "f" from time
-        f_out = self.theta_out(t)
-
-        v3 = self.v3_f_C(f_out)
+        v3 = self._v3_f_C(f_out)
 
         return v3 + self.gamma
 
 
-    def get_component_velocities(self, dates=None):
+    def get_velocities(self, dates=None):
         '''
         Return vA, vB, and vC for all dates provided.
         '''
@@ -277,11 +300,11 @@ class ST3(ST1):
         dates = np.atleast_1d(dates)
 
 
-        vAs = np.array([self.vA_t(date) for date in dates])
-        vBs = np.array([self.vB_t(date) for date in dates])
-        vCs = np.array([self.vC_t(date) for date in dates])
+        vAs = np.array([self._vA_t(date) for date in dates])
+        vBs = np.array([self._vB_t(date) for date in dates])
+        vCs = np.array([self._vC_t(date) for date in dates])
 
         return (vAs, vBs, vCs)
 
 
-models = {"SB1":SB1, "SB2":SB2, "ST1":ST1, "ST3":ST3}
+models = {"SB1":SB1, "SB2":SB2, "ST1":ST1, "ST2":ST2, "ST3":ST3}
