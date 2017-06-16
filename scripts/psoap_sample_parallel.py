@@ -482,12 +482,9 @@ try:
     print("Loaded user defined prior.")
 except ImportError:
     print("Using default prior.")
-    print("Model is ", model)
     # Set the default priors.
     priors = {"SB1":prior_SB1, "SB2":prior_SB2, "ST3":prior_ST3}
     prior = priors[model]
-
-    print("successfully parsed prior")
 
 def lnprob(p):
 
@@ -510,9 +507,12 @@ def lnprob(p):
     # Add any the prior to the total
     return s + lnprior
 
+print("Defined lnprob")
 
 # Import the Metropolis-hastings sampler to do the sampling in the top level parameters
 from emcee import MHSampler
+
+print("Imported emcee")
 
 # Determine how many parameters we will actually be fitting
 # The difference between all of the parameters and the parameters we will be fixing
@@ -523,6 +523,7 @@ p0 = utils.convert_dict(model, config["fix_params"], **pars)
 
 # To check feasibility, evaluate the starting position. If this evaluates to -np.inf, then just
 # exit, since we might be wasting our time evaluating the rest.
+print("Trying first evaluation")
 lnp0 = lnprob(p0)
 if lnp0 == -np.inf:
     print("Starting position for Markov Chain evaluates to -np.inf")
