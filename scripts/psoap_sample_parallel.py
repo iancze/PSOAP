@@ -487,6 +487,7 @@ except ImportError:
     priors = {"SB1":prior_SB1, "SB2":prior_SB2, "ST3":prior_ST3}
     prior = priors[model]
 
+    print("successfully parsed prior")
 
 def lnprob(p):
 
