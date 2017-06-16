@@ -50,15 +50,18 @@ help:
 	@echo "  doctest    to run all doctests embedded in the documentation (if enabled)"
 	@echo "  coverage   to run coverage check of the documentation (if enabled)"
 
-tutorials/%.rst: .static/notebooks/%.ipynb tutorial_rst.tpl
-	juypter nbconvert --template .templates/tutorial_rst --to rst $< --output-dir tutorials
+default: dirhtml
+TUTORIALS = tutorial.rst
+
+tutorial.rst: .static/notebooks/tutorial.ipynb
+	jupyter nbconvert --template .templates/tutorial_rst --to rst $< --output-dir .
 
 .PHONY: clean
 clean:
 	rm -rf $(BUILDDIR)/*
 
 .PHONY: html
-html:
+html: $(TUTORIALS)
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."

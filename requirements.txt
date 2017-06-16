@@ -1,5 +1,7 @@
 numpy
 scipy
 cython
+h5py
 astropy
 emcee
+celerite
