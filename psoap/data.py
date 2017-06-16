@@ -37,25 +37,22 @@ def lredshift(lwl, v):
     lwl_red = lwl + v/C.c_kms
     return lwl_red
 
-def replicate_wls(lwls, velocities, mask=None):
+def replicate_wls(lwls, velocities, mask):
     '''
     Using the set of velocities calculated from an orbit, copy and *blue*-shift the input ln(wavelengths), so that they correspond to the rest-frame wavelengths of the individual components. This routine is primarily for producing  replicated ln-wavelength vectors ready to feed to the GP routines.
 
     Args:
-        lwls (2D np.array with shape ``(n_epochs, n_pixels)``): the natural log of the (unmasked) input wavelength vectors.
+        lwls (1D np.array with length ``(n_epochs * n_good_pixels)``): this dataproduct is the 1D representation of the natural log of the (masked) input wavelength vectors. The masking process naturally makes it 1D.
         velocities (2D np.array with shape ``(n_components, n_epochs)``) : a set of velocities determined from an orbital model.
-        mask (optional): a np.bool mask used to select the good datapoints.
+        mask : the np.bool mask used to select the good datapoints. It is necessary for properly replicating the velocities to the right epoch.
 
     Returns:
-        np.array: A 2D ``(n_components, n_epochs * n_pixels)`` shape array of the wavelength vectors *blue*-shifted according to the velocities. This means that for each component, the arrays are flattened into 1D vectors.
+        np.array: A 2D ``(n_components, n_epochs * n_good_pixels)`` shape array of the wavelength vectors *blue*-shifted according to the velocities. This means that for each component, the arrays are flattened into 1D vectors.
     '''
 
-    n_epochs_lwl = len(lwls.shape)
+    # n_epochs_lwl = len(lwls)
     n_components, n_epochs = velocities.shape
-    assert n_epochs_lwl == n_epochs, "There is a mismatch between the number of epochs implied by the log-wavelength vector ({:}) and the number of epochs implied by the orbital velocities {:}".format(n_epochs_lwl, n_epochs)
-
-    if mask is None:
-        mask = np.ones_like(lwl, dytpe=np.bool)
+    # assert n_epochs_lwl == n_epochs, "There is a mismatch between the number of epochs implied by the log-wavelength vector ({:}) and the number of epochs implied by the orbital velocities {:}".format(n_epochs_lwl, n_epochs)
 
     n_good_pix = np.sum(mask)
 
