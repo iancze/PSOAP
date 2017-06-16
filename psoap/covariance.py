@@ -9,8 +9,11 @@ from psoap import constants as C
 from psoap import matrix_functions
 from psoap.data import lredshift
 
-import celerite
-from celerite import terms
+try:
+    import celerite
+    from celerite import terms
+except ImportError:
+    print("If you want to use the fast 1D (SB1 or ST1) models, please install celerite")
 
 
 def predict_f(lwl_known, fl_known, sigma_known, lwl_predict, amp_f, l_f, mu_GP=1.0):

@@ -13,9 +13,11 @@ Copyright Ian Czekala 2016-17
 
 Preprint available on the arXiv here: [https://arxiv.org/abs/1702.05652](https://arxiv.org/abs/1702.05652)
 
-## Installation
+Documentation and installation instructions are available here: http://psoap.readthedocs.io
 
-As the package is still under heavy development, we recommend installing it in develop mode
+## Developer Installation
+
+If you want to tinker with the package, as it is still under development, we recommend installing it in develop mode
 
     $ pip install -e .
 
