@@ -14,7 +14,6 @@ All of these packages can be installed via an Anaconda python installation.
 
 PSOAP has preliminary support for using the `celerite package <http://celerite.readthedocs.io/>`_, which implements fast, one dimensional Gaussian processes which are used when fitting a single-lined spectroscopic binary or triple. You can optionally install this package following the link above.
 
-
 Then, clone the package from the `github repository <https://github.com/iancze/PSOAP>`_
 and change to the top level ``PSOAP`` directory. Because the ``PSOAP`` package is still under occasional development, it may be wise to install the package in 'development mode' via the following commands::
 
@@ -29,9 +28,15 @@ Then, you will need to add the ``psoap/scripts`` directory to your ``PATH`` and 
     PSOAP successfully installed and linked.
 
 
-If you installed the package via development mode, then it in the case that the package is upgraded, it is easy to upgrade your local copy
-
-This has the added benefit that the package can be easily upgraded to match the github repository by simply pulling down the latest changes and rerunning ::
+If you installed the package via development mode, then it in the case that the package is upgraded, it is easy to upgrade your local copy by simply pulling down the latest changes and rerunning the build script::
 
     $ git pull
     $ python setup.py build_ext --inplace
+
+Once we reach version 1.0, then the install command will be::
+
+    $ python setup.py install
+
+or::
+
+    $ pip install psoap
