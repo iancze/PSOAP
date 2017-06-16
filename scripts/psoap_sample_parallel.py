@@ -482,6 +482,7 @@ try:
     print("Loaded user defined prior.")
 except ImportError:
     print("Using default prior.")
+    print("Model is ", model)
     # Set the default priors.
     priors = {"SB1":prior_SB1, "SB2":prior_SB2, "ST3":prior_ST3}
     prior = priors[model]

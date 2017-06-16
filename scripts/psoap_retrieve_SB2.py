@@ -63,7 +63,7 @@ def process_chunk(row):
     orb = orbit.SB2(q, K, e, omega, P, T0, gamma, obs_dates=dates)
 
     # predict velocities for each epoch
-    vAs, vBs = orb.get_component_velocities()
+    vAs, vBs = orb.get_velocities()
 
     # shift wavelengths according to these velocities to rest-frame of A component
     # Load the data
