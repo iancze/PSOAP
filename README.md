@@ -1,6 +1,8 @@
 # PSOAP
 Pronounced "soap."
 
+![documentation status](http://psoap.readthedocs.io/en/latest/?badge=latest)
+
 Precision Spectroscopic Orbits A-Parametrically
 
 ![disentangling loop](output.gif "disentangling loop")
