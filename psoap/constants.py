@@ -1,5 +1,11 @@
 import numpy as np
 
+
+import psoap
+import os
+
+PSOAP_dir = os.path.dirname(psoap.__file__)[:-5]
+
 ##################################################
 # Constants
 ##################################################

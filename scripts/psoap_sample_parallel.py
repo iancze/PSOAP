@@ -78,6 +78,8 @@ for chunk in chunks:
     chunkSpec.apply_mask()
     chunk_data.append(chunkSpec)
 
+# The name of the model
+model = config["model"]
 pars = config["parameters"]
 
 # Set up the logger
@@ -85,7 +87,7 @@ if args.debug:
     logging.basicConfig(format="%(asctime)s - %(levelname)s - %(name)s -  %(message)s", filename="{}log.log".format(routdir), level=logging.DEBUG, filemode="w", datefmt='%m/%d/%Y %I:%M:%S %p')
 
 # Create a partial function which maps a vector of floats to parameters
-convert_vector_p = partial(utils.convert_vector, model=config["model"], fix_params=config["fix_params"], **pars)
+convert_vector_p = partial(utils.convert_vector, model=model, fix_params=config["fix_params"], **pars)
 
 def info(title):
     '''
@@ -110,8 +112,8 @@ class Worker:
         '''
 
         # Choose which lnprob we will be using based off of the model type
-        lnprobs = {"SB1":self.lnprob_SB1, "SB2":self.lnprob_SB2, "ST3":self.lnprob_ST3}
-        self.lnprob = lnprobs[config["model"]]
+        # lnprobs = {"SB1":self.lnprob_SB1, "SB2":self.lnprob_SB2, "ST3":self.lnprob_ST3}
+        # self.lnprob = lnprobs[model]
 
         # The list of possible function calls we can make.
         self.func_dict = {"INIT": self.initialize,
@@ -163,123 +165,154 @@ class Worker:
         self.V11 = np.empty((self.N, self.N), dtype=np.float64)
 
         # Create an orbit
-        self.orb = orbit.models[config["model"]](**pars, obs_dates=self.date1D)
+        self.orb = orbit.models[model](**pars, obs_dates=self.date1D)
 
-
-    def lnprob_SB1(self, p):
+    def lnprob(self, p):
         '''
-        Update the model to the top level orbital (Theta) parameters and then evaluate the lnprob.
-        Intended to be called from the master process via the command "LNPROB".
+        Unified lnprob interface.
+
+        Args:
+            p (np.float): vector containing the model parameters
+
+        Returns:
+            float : the lnlikelihood of the model parameters.
         '''
 
-        if args.debug:
-            # Designed to be subclassed based upon what model we want to use.
-            self.logger.debug("Updating orbital parameters to {}".format(p))
+        # separate the parameters into orbital and GP based upon the model type
+        # also backfill any parameters that we have fixed for this analysis
+        p_orb, p_GP = convert_separate_p(p)
 
-        # unroll p
-        K, e, omega, P, T0, gamma, amp_f, l_f = convert_vector_p(p)
-
-        # Update the orbit
-        self.orb.K = K
-        self.orb.e = e
-        self.orb.omega = omega
-        self.orb.P = P
-        self.orb.T0 = T0
-        self.orb.gamma = gamma
-
-        # predict velocities for each epoch
-        vAs = self.orb.get_component_velocities()[0]
+        velocities = orbit.models[model](*p_orb, self.date1D).get_velocities()
 
         # Make sure none are faster than speed of light
-        if np.any(np.abs(vAs) >= C.c_kms):
+        if np.any(np.abs(np.array(velocities)) >= C.c_kms):
             return -np.inf
 
+        # Get shifted wavelengths
+        lwls = replicate_wls(self.lwl, velocities, self.mask)
 
-        # shift wavelengths according to these velocities to rest-frame of A component
-        lwls_A = lredshift(self.lwl, (-vAs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
-
-        # fill out covariance matrix
-        lnp = covariance.lnlike_f(self.V11, lwls_A.flatten(), self.fl, self.sigma, amp_f, l_f)
+        # Feed velocities and GP parameters to fill out covariance matrix appropriate for this model
+        lnp = covariance.lnlike[model](self.V11, *lwls, self.fl, self.sigma, *p_GP)
 
         gc.collect()
 
         return lnp
 
-    def lnprob_SB2(self, p):
-        # unroll p
-        q, K, e, omega, P, T0, gamma, amp_f, l_f, amp_g, l_g = convert_vector_p(p)
 
-        # Update the orbit
-        self.orb.q = q
-        self.orb.K = K
-        self.orb.e = e
-        self.orb.omega = omega
-        self.orb.P = P
-        self.orb.T0 = T0
-        self.orb.gamma = gamma
-
-        # predict velocities for each epoch
-        vAs, vBs = self.orb.get_component_velocities()
-
-        # Make sure none are faster than speed of light
-        if np.any(np.abs(vAs) >= C.c_kms) or np.any(np.abs(vBs) >= C.c_kms):
-            return -np.inf
-
-
-        # shift wavelengths according to these velocities to rest-frame of A component
-        lwls_A = lredshift(self.lwl, (-vAs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
-        lwls_B = lredshift(self.lwl, (-vBs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
-
-        # fill out covariance matrix
-        lnp = covariance.lnlike_f_g(self.V11, lwls_A.flatten(), lwls_B.flatten(), self.fl, self.sigma, amp_f, l_f, amp_g, l_g)
-
-        if lnp == -np.inf and args.debug:
-            self.logger.debug("Worker {} evaulated -np.inf".format(self.key))
-
-        gc.collect()
-
-        return lnp
-
-    def lnprob_ST3(self, p):
-        # unroll p
-        q_in, K_in, e_in, omega_in, P_in, T0_in, q_out, K_out, e_out, omega_out, P_out, T0_out, gamma, amp_f, l_f, amp_g, l_g, amp_h, l_h = convert_vector_p(p)
-
-        # Update the orbit
-        self.orb.q_in = q_in
-        self.orb.K_in = K_in
-        self.orb.e_in = e_in
-        self.orb.omega_in = omega_in
-        self.orb.P_in = P_in
-        self.orb.T0_in = T0_in
-        self.orb.q_out = q_out
-        self.orb.K_out = K_out
-        self.orb.e_out = e_out
-        self.orb.omega_out = omega_out
-        self.orb.P_out = P_out
-        self.orb.T0_out = T0_out
-        self.orb.gamma = gamma
-
-        # predict velocities for each epoch
-        vAs, vBs, vCs = self.orb.get_component_velocities()
-
-        # Make sure none are faster than speed of light
-        if np.any(np.abs(vAs) >= C.c_kms) or np.any(np.abs(vBs) >= C.c_kms) or np.any(np.abs(vCs) >= C.c_kms):
-            return -np.inf
-
-        # shift wavelengths according to these velocities to rest-frame of A component
-        lwls_A = lredshift(self.lwl, (-vAs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
-        lwls_B = lredshift(self.lwl, (-vBs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
-        lwls_C = lredshift(self.lwl, (-vCs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
-
-        # fill out covariance matrix
-        lnp = covariance.lnlike_f_g_h(self.V11, lwls_A.flatten(), lwls_B.flatten(), lwls_C.flatten(), self.fl, self.sigma, amp_f, l_f, amp_g, l_g, amp_h, l_h)
-
-        if lnp == -np.inf and args.debug:
-            self.logger.debug("Worker {} evaulated -np.inf".format(self.key))
-
-        gc.collect()
-
-        return lnp
+    # def lnprob_SB1(self, p):
+    #     '''
+    #     Update the model to the top level orbital (Theta) parameters and then evaluate the lnprob.
+    #     Intended to be called from the master process via the command "LNPROB".
+    #     '''
+    #
+    #     if args.debug:
+    #         # Designed to be subclassed based upon what model we want to use.
+    #         self.logger.debug("Updating orbital parameters to {}".format(p))
+    #
+    #     # unroll p
+    #     K, e, omega, P, T0, gamma, amp_f, l_f = convert_vector_p(p)
+    #
+    #     # Update the orbit
+    #     self.orb.K = K
+    #     self.orb.e = e
+    #     self.orb.omega = omega
+    #     self.orb.P = P
+    #     self.orb.T0 = T0
+    #     self.orb.gamma = gamma
+    #
+    #     # predict velocities for each epoch
+    #     vAs = self.orb.get_component_velocities()[0]
+    #
+    #     # Make sure none are faster than speed of light
+    #     if np.any(np.abs(vAs) >= C.c_kms):
+    #         return -np.inf
+    #
+    #
+    #     # shift wavelengths according to these velocities to rest-frame of A component
+    #     lwls_A = lredshift(self.lwl, (-vAs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
+    #
+    #     # fill out covariance matrix
+    #     lnp = covariance.lnlike_f(self.V11, lwls_A.flatten(), self.fl, self.sigma, amp_f, l_f)
+    #
+    #     gc.collect()
+    #
+    #     return lnp
+    #
+    # def lnprob_SB2(self, p):
+    #     # unroll p
+    #     q, K, e, omega, P, T0, gamma, amp_f, l_f, amp_g, l_g = convert_vector_p(p)
+    #
+    #     # Update the orbit
+    #     self.orb.q = q
+    #     self.orb.K = K
+    #     self.orb.e = e
+    #     self.orb.omega = omega
+    #     self.orb.P = P
+    #     self.orb.T0 = T0
+    #     self.orb.gamma = gamma
+    #
+    #     # predict velocities for each epoch
+    #     vAs, vBs = self.orb.get_component_velocities()
+    #
+    #     # Make sure none are faster than speed of light
+    #     if np.any(np.abs(vAs) >= C.c_kms) or np.any(np.abs(vBs) >= C.c_kms):
+    #         return -np.inf
+    #
+    #
+    #     # shift wavelengths according to these velocities to rest-frame of A component
+    #     lwls_A = lredshift(self.lwl, (-vAs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
+    #     lwls_B = lredshift(self.lwl, (-vBs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
+    #
+    #     # fill out covariance matrix
+    #     lnp = covariance.lnlike_f_g(self.V11, lwls_A.flatten(), lwls_B.flatten(), self.fl, self.sigma, amp_f, l_f, amp_g, l_g)
+    #
+    #     if lnp == -np.inf and args.debug:
+    #         self.logger.debug("Worker {} evaulated -np.inf".format(self.key))
+    #
+    #     gc.collect()
+    #
+    #     return lnp
+    #
+    # def lnprob_ST3(self, p):
+    #     # unroll p
+    #     q_in, K_in, e_in, omega_in, P_in, T0_in, q_out, K_out, e_out, omega_out, P_out, T0_out, gamma, amp_f, l_f, amp_g, l_g, amp_h, l_h = convert_vector_p(p)
+    #
+    #     # Update the orbit
+    #     self.orb.q_in = q_in
+    #     self.orb.K_in = K_in
+    #     self.orb.e_in = e_in
+    #     self.orb.omega_in = omega_in
+    #     self.orb.P_in = P_in
+    #     self.orb.T0_in = T0_in
+    #     self.orb.q_out = q_out
+    #     self.orb.K_out = K_out
+    #     self.orb.e_out = e_out
+    #     self.orb.omega_out = omega_out
+    #     self.orb.P_out = P_out
+    #     self.orb.T0_out = T0_out
+    #     self.orb.gamma = gamma
+    #
+    #     # predict velocities for each epoch
+    #     vAs, vBs, vCs = self.orb.get_component_velocities()
+    #
+    #     # Make sure none are faster than speed of light
+    #     if np.any(np.abs(vAs) >= C.c_kms) or np.any(np.abs(vBs) >= C.c_kms) or np.any(np.abs(vCs) >= C.c_kms):
+    #         return -np.inf
+    #
+    #     # shift wavelengths according to these velocities to rest-frame of A component
+    #     lwls_A = lredshift(self.lwl, (-vAs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
+    #     lwls_B = lredshift(self.lwl, (-vBs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
+    #     lwls_C = lredshift(self.lwl, (-vCs[:,np.newaxis] * np.ones_like(self.mask))[self.mask])
+    #
+    #     # fill out covariance matrix
+    #     lnp = covariance.lnlike_f_g_h(self.V11, lwls_A.flatten(), lwls_B.flatten(), lwls_C.flatten(), self.fl, self.sigma, amp_f, l_f, amp_g, l_g, amp_h, l_h)
+    #
+    #     if lnp == -np.inf and args.debug:
+    #         self.logger.debug("Worker {} evaulated -np.inf".format(self.key))
+    #
+    #     gc.collect()
+    #
+    #     return lnp
 
 
 
@@ -451,7 +484,7 @@ except ImportError:
     print("Using default prior.")
     # Set the default priors.
     priors = {"SB1":prior_SB1, "SB2":prior_SB2, "ST3":prior_ST3}
-    prior = priors[config["model"]]
+    prior = priors[model]
 
 
 def lnprob(p):
@@ -481,10 +514,10 @@ from emcee import MHSampler
 
 # Determine how many parameters we will actually be fitting
 # The difference between all of the parameters and the parameters we will be fixing
-dim = len(utils.registered_params[config["model"]]) - len(config["fix_params"])
+dim = len(utils.registered_params[model]) - len(config["fix_params"])
 
 # Read in starting parameters
-p0 = utils.convert_dict(config["model"], config["fix_params"], **pars)
+p0 = utils.convert_dict(model, config["fix_params"], **pars)
 
 # To check feasibility, evaluate the starting position. If this evaluates to -np.inf, then just
 # exit, since we might be wasting our time evaluating the rest.
@@ -511,7 +544,7 @@ try:
     print("using optimal jumps")
 except:
     print("using hand-specified jumps")
-    cov = utils.convert_dict(config["model"], config["fix_params"], **config["jumps"])**2 * np.eye(dim)
+    cov = utils.convert_dict(model, config["fix_params"], **config["jumps"])**2 * np.eye(dim)
 
 sampler = MHSampler(cov, dim, lnprob)
 

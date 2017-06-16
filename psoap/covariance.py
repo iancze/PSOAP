@@ -360,6 +360,9 @@ def lnlike_f_g_h(V11, wl_f, wl_g, wl_h, fl, sigma, amp_f, l_f, amp_g, l_g, amp_h
 
     return -0.5 * (np.dot((fl - mu_GP).T, cho_solve((factor, flag), (fl - mu_GP))) + logdet)
 
+# Assemble lnlikelihood functions for the different models
+lnlike = {"SB1": lnlike_f, "SB2": lnlike_f_g, "ST1": lnlike_f, "ST2": lnlike_f_g, "ST3": lnlike_f_g_h}
+
 def optimize_GP_f(wl_known, fl_known, sigma_known, amp_f, l_f, mu_GP=1.0):
     '''
     Optimize the GP hyperparameters for the given slice of data. Amp and lv are starting guesses.

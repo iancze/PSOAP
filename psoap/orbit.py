@@ -1,12 +1,22 @@
 import numpy as np
 from scipy.optimize import fsolve
-
+from psoap import utils
 
 class SB1:
     '''
-    Describing a single-line Spectroscopic binary.
+    Orbital model for a single-line spectroscopic binary.
+
+    Args:
+        K (float): velocity semi-amplitude
+        e (float): eccentricity (must be between ``[0.0, 1.0)``)
+        omega (float): argument of periastron (degrees)
+        P (float): period (days)
+        T0 (float): epoch of periastron (JD)
+        gamma (float): systemic velocity (km/s)
+        obs_dates (1D np.array): dates of observation (JD)
     '''
     def __init__(self, K, e, omega, P, T0, gamma, obs_dates=None, **kwargs):
+        assert (e >= 0.0) and (e < 1.0), "Eccentricity must be between [0, 1)"
         self.K = K # [km/s]
         self.e = e
         self.omega = omega # [deg]
@@ -59,7 +69,13 @@ class SB1:
 
     def get_velocities(self, dates=None):
         '''
-        Return vA for all dates provided.
+        Calculate the velocities of the primary (``vA``) for all dates provided.
+
+        Args:
+            dates (optional): if provided, calculate velocities at this new vector of dates, rather than the one provided when the object was initialized.
+
+        Returns:
+            np.array: A ``(1, nvels)`` shape array of the primary velocities
         '''
 
         if dates is None and self.obs_dates is None:
@@ -76,7 +92,17 @@ class SB1:
 
 class SB2(SB1):
     '''
-    Methods for solving a double-lined spectroscopic orbit.
+    Orbital model for a double-line spectroscopic binary.
+
+    Args:
+        q (float): mass ratio ``M_B / M_A``
+        K (float): velocity semi-amplitude
+        e (float): eccentricity (must be between ``[0.0, 1.0)``)
+        omega (float): argument of periastron (degrees)
+        P (float): period (days)
+        T0 (float): epoch of periastron (JD)
+        gamma (float): systemic velocity (km/s)
+        obs_dates (1D np.array): dates of observation (JD)
     '''
     def __init__(self, q, K, e, omega, P, T0, gamma, obs_dates=None, **kwargs):
         super().__init__(K, e, omega, P, T0, gamma, obs_dates=obs_dates, **kwargs)
@@ -96,7 +122,13 @@ class SB2(SB1):
 
     def get_velocities(self, dates=None):
         '''
-        Return both vA and vB for all dates provided.
+        Calculate the velocities of the primary (``vA``) and secondary (``vB``) for all dates provided.
+
+        Args:
+            dates (optional): if provided, calculate velocities at this new vector of dates, rather than the one provided when the object was initialized.
+
+        Returns:
+            np.array: A ``(2, nvels)`` shape array of the primary and secondary velocities
         '''
 
         if dates is None and self.obs_dates is None:
@@ -110,13 +142,29 @@ class SB2(SB1):
         vAs = np.array([self._vA_t(date) for date in dates])
         vBs = np.array([self._vB_t(date) for date in dates])
 
-        return (vAs, vBs)
+        return np.vstack((vAs, vBs))
 
 class ST1:
     '''
-    A hierarchical triple star orbit for which we only see the primary lines.
+    Orbital model for a single-line hierarchical spectroscopic triple.
+
+    Args:
+        K_in (float): velocity semi-amplitude for inner orbit
+        e_in (float): eccentricity for inner orbit (must be between ``[0.0, 1.0)``)
+        omega_in (float): argument of periastron for inner orbit (degrees)
+        P_in (float): inner period (days)
+        T0_in (float): epoch of periastron for inner orbit (JD)
+        K_out (float): velocity semi-amplitude for outer orbit
+        e_out (float): eccentricity for outer orbit (must be between ``[0.0, 1.0)``)
+        omega_out (float): argument of periastron for outer orbit (degrees)
+        P_out (float): outer period (days)
+        T0_out (float): epoch of periastron for outer orbit (JD)
+        gamma (float): systemic velocity (km/s)
+        obs_dates (1D np.array): dates of observation (JD)
     '''
     def __init__(self, K_in, e_in, omega_in, P_in, T0_in, K_out, e_out, omega_out, P_out, T0_out, gamma, obs_dates=None, **kwargs):
+        assert (e_in >= 0.0) and (e_in < 1.0), "Inner eccentricity must be between [0, 1)"
+        assert (e_out >= 0.0) and (e_out < 1.0), "Outer eccentricity must be between [0, 1)"
         self.K_in = K_in # [km/s]
         self.e_in = e_in
         self.omega_in = omega_in # [deg]
@@ -199,7 +247,13 @@ class ST1:
 
     def get_velocities(self, dates=None):
         '''
-        Return vA for all dates provided.
+        Calculate the velocities of the primary (``vA``) for all dates provided.
+
+        Args:
+            dates (optional): if provided, calculate velocities at this new vector of dates, rather than the one provided when the object was initialized.
+
+        Returns:
+            np.array: A ``(1, nvels)`` shape array of the primary velocities
         '''
 
         if dates is None and self.obs_dates is None:
@@ -216,7 +270,22 @@ class ST1:
 
 class ST2(ST1):
     '''
-    Solving a triple star orbit for which we see both sets of lines of the inner binary.
+    Orbital model for a double-line (inner orbit) hierarchical spectroscopic triple.
+
+    Args:
+        q_in (float): mass ratio ``M_B / M_A``
+        K_in (float): velocity semi-amplitude for inner orbit
+        e_in (float): eccentricity for inner orbit (must be between ``[0.0, 1.0)``)
+        omega_in (float): argument of periastron for inner orbit (degrees)
+        P_in (float): inner period (days)
+        T0_in (float): epoch of periastron for inner orbit (JD)
+        K_out (float): velocity semi-amplitude for outer orbit
+        e_out (float): eccentricity for outer orbit (must be between ``[0.0, 1.0)``)
+        omega_out (float): argument of periastron for outer orbit (degrees)
+        P_out (float): outer period (days)
+        T0_out (float): epoch of periastron for outer orbit (JD)
+        gamma (float): systemic velocity (km/s)
+        obs_dates (1D np.array): dates of observation (JD)
     '''
     def __init__(self, q_in, K_in, e_in, omega_in, P_in, T0_in, K_out, e_out, omega_out, P_out, T0_out, gamma, obs_dates=None, **kwargs):
         super().__init__(K_in, e_in, omega_in, P_in, T0_in, K_out, e_out, omega_out, P_out, T0_out, gamma, obs_dates=obs_dates, **kwargs)
@@ -242,7 +311,13 @@ class ST2(ST1):
 
     def get_velocities(self, dates=None):
         '''
-        Return vA and vB for all dates provided.
+        Calculate the velocities of the primary (``vA``) and secondary (``vB``) for all dates provided.
+
+        Args:
+            dates (optional): if provided, calculate velocities at this new vector of dates, rather than the one provided when the object was initialized.
+
+        Returns:
+            np.array: A ``(2, nvels)`` shape array of the primary and secondary velocities
         '''
 
         if dates is None and self.obs_dates is None:
@@ -257,12 +332,28 @@ class ST2(ST1):
         vAs = np.array([self._vA_t(date) for date in dates])
         vBs = np.array([self._vB_t(date) for date in dates])
 
-        return (vAs, vBs)
+        return np.vstack((vAs, vBs))
 
 
 class ST3(ST2):
     '''
-    Techniques describing solving for a triple star orbit for which we see all lines.
+    Orbital model for a double-line (inner orbit) hierarchical spectroscopic triple.
+
+    Args:
+        q_in (float): mass ratio ``M_B / M_A``
+        K_in (float): velocity semi-amplitude for inner orbit
+        e_in (float): eccentricity for inner orbit (must be between ``[0.0, 1.0)``)
+        omega_in (float): argument of periastron for inner orbit (degrees)
+        P_in (float): inner period (days)
+        T0_in (float): epoch of periastron for inner orbit (JD)
+        q_out (float): mass ratio ``M_C / (M_A + M_B)``
+        K_out (float): velocity semi-amplitude for outer orbit
+        e_out (float): eccentricity for outer orbit (must be between ``[0.0, 1.0)``)
+        omega_out (float): argument of periastron for outer orbit (degrees)
+        P_out (float): outer period (days)
+        T0_out (float): epoch of periastron for outer orbit (JD)
+        gamma (float): systemic velocity (km/s)
+        obs_dates (1D np.array): dates of observation (JD)
     '''
     def __init__(self, q_in, K_in, e_in, omega_in, P_in, T0_in, q_out, K_out, e_out, omega_out, P_out, T0_out, gamma, obs_dates=None, **kwargs):
         super().__init__(q_in, K_in, e_in, omega_in, P_in, T0_in, K_out, e_out, omega_out, P_out, T0_out, gamma, obs_dates=obs_dates, **kwargs)
@@ -288,7 +379,13 @@ class ST3(ST2):
 
     def get_velocities(self, dates=None):
         '''
-        Return vA, vB, and vC for all dates provided.
+        Calculate the velocities of the primary (``vA``), secondary (``vB``), and tertiary (``vC``) for all dates provided.
+
+        Args:
+            dates (optional): if provided, calculate velocities at this new vector of dates, rather than the one provided when the object was initialized.
+
+        Returns:
+            np.array: A ``(3, nvels)`` shape array of the primary, secondary, and tertiary velocities
         '''
 
         if dates is None and self.obs_dates is None:
@@ -304,7 +401,7 @@ class ST3(ST2):
         vBs = np.array([self._vB_t(date) for date in dates])
         vCs = np.array([self._vC_t(date) for date in dates])
 
-        return (vAs, vBs, vCs)
+        return np.vstack((vAs, vBs, vCs))
 
-
+# General routines
 models = {"SB1":SB1, "SB2":SB2, "ST1":ST1, "ST2":ST2, "ST3":ST3}

@@ -4,8 +4,16 @@ import numpy as np
 registered_params = {"SB1": ["K", "e", "omega", "P", "T0", "gamma", "amp_f", "l_f"],
 "SB2": ["q", "K", "e", "omega", "P", "T0", "gamma", "amp_f", "l_f", "amp_g", "l_g"],
 "ST1": ["K_in", "e_in", "omega_in", "P_in", "T0_in", "K_out", "e_out", "omega_out", "P_out", "T0_out", "gamma", "amp_f", "l_f"],
+"ST2": ["q_in", "K_in", "e_in", "omega_in", "P_in", "T0_in", "K_out", "e_out", "omega_out", "P_out", "T0_out", "gamma", "amp_f", "l_f"],
 "ST3": ["q_in", "K_in", "e_in", "omega_in", "P_in", "T0_in", "q_out", "K_out", "e_out", "omega_out", "P_out", "T0_out", "gamma", "amp_f", "l_f", "amp_g", "l_g", "amp_h", "l_h"]}
 
+registered_models = registered_params.keys()
+
+# Calculate how many orbital parameters there are to each model.
+# For now, we'll just calculate this based upon the position of the "gamma" parameter
+n_params_orb = {model: (registered_params[model].index("gamma") + 1) for model in registered_params.keys()}
+
+# labels used for plotting
 registered_labels = {"SB1": [r"$K$", r"$e$", r"$\omega$", r"$P$", r"$T_0$", r"$\gamma$", r"$a_f$", r"$l_f$"],
 "SB2": [r"$q$", r"$K$", r"$e$", r"$\omega$", r"$P$", r"$T_0$", r"$\gamma$", r"$a_f$", r"$l_f$", r"$a_g$", r"$l_g$"],
 "ST3": [r"$q_\mathrm{in}$", r"$K_\mathrm{in}$", r"$e_\mathrm{in}$", r"$\omega_\mathrm{in}$", r"$P_\mathrm{in}$", r"$T_{0,\mathrm{in}}$", r"$q_\mathrm{out}$", r"$K_\mathrm{out}$", r"$e_\mathrm{out}$", r"$\omega_\mathrm{out}$", r"$P_\mathrm{out}$", r"$T_{0,\mathrm{out}}$", r"$\gamma$", r"$a_f$", r"$l_f$", r"$a_g$", r"$l_g$", r"$a_h$", r"$l_h$"]}
@@ -19,10 +27,16 @@ registered_labels = {"SB1": [r"$K$", r"$e$", r"$\omega$", r"$P$", r"$T_0$", r"$\
 def convert_vector(p, model, fix_params, **kwargs):
     '''Unroll a vector of parameter values into a parameter type, using knowledge about which model we are fitting, the parameters we are fixing, and the default values of those parameters.
 
-    p : input vector of only a subset of parmeter values.
-    model : string of "SB1", "SB2", etc..
-    fix_params : list of names of parameters that will be fixed
-    kwargs: will host param_name: default_value pairs'''
+    Args:
+        p (np.float) : 1D input array of only a subset of parameter values.
+        model (str): "SB1", "SB2", etc..
+        fix_params (list of str): names of parameters that will be fixed
+        **kwargs: input for ``{param_name: default_value}`` pairs
+
+    Returns:
+        (np.float, np.float) : a 2-tuple of the  full vectors for the orbital parameters, and the GP parameters, augmented with the previously missing values.
+
+    '''
 
     # Select the registered parameters corresponding to this model
     reg_params = registered_params[model]
@@ -46,7 +60,13 @@ def convert_vector(p, model, fix_params, **kwargs):
     p_fixed = np.array([kwargs[par_name] for par_name in fix_params])
     par_vec[fix_ind] = p_fixed
 
-    return par_vec
+    # Now split it to the orbital parameters and the GP parameters
+    ind_split = n_params_orb[model]
+
+    par_orb = par_vec[:ind_split]
+    par_GP = par_vec[ind_split:]
+
+    return (par_orb, par_GP)
 
 # function convert_dict(p::Dict, model::AbstractString)
 def convert_dict(model, fix_params, **kwargs):

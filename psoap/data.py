@@ -1,7 +1,3 @@
-'''
-Load the data files.
-'''
-
 import inspect
 import os
 import numpy as np
@@ -13,7 +9,14 @@ from psoap import constants as C
 
 def redshift(wl, v):
     '''
-    Redshift a collection of wavelengths. This means that a positive velocity corresponds to a lengthening (increase) of the wavelengths in the array.
+    Redshift a vector of wavelengths. A positive velocity corresponds to a lengthening (increase) of the wavelengths in the array.
+
+    Args:
+        wl (np.array, arbitrary shape): the input wavelengths
+        velocity (float): the velocity by which to redshift the wavelengths
+
+    Returns:
+        np.array: A redshifted version of the wavelength vector
     '''
 
     wl_red = wl * np.sqrt((C.c_kms + v)/(C.c_kms - v))
@@ -21,26 +24,62 @@ def redshift(wl, v):
 
 def lredshift(lwl, v):
     '''
-    Redshift spectra that are already in log-lambda. A positive velocity corresponds to a lengthing (increase) of the wavelengths of the array.
+    Redshift a vector of wavelengths that are already in log-lamba (natural log). A positive velocity corresponds to a lengthening (increase) of the wavelengths in the array.
+
+    Args:
+        wl (np.array, arbitrary shape): the input ln(wavelengths).
+        velocity (float): the velocity by which to redshift the wavelengths
+
+    Returns:
+        np.array: A redshifted version of the wavelength vector
     '''
 
     lwl_red = lwl + v/C.c_kms
     return lwl_red
 
+def replicate_wls(lwls, velocities, mask=None):
+    '''
+    Using the set of velocities calculated from an orbit, copy and *blue*-shift the input ln(wavelengths), so that they correspond to the rest-frame wavelengths of the individual components. This routine is primarily for producing  replicated ln-wavelength vectors ready to feed to the GP routines.
+
+    Args:
+        lwls (2D np.array with shape ``(n_epochs, n_pixels)``): the natural log of the (unmasked) input wavelength vectors.
+        velocities (2D np.array with shape ``(n_components, n_epochs)``) : a set of velocities determined from an orbital model.
+        mask (optional): a np.bool mask used to select the good datapoints.
+
+    Returns:
+        np.array: A 2D ``(n_components, n_epochs * n_pixels)`` shape array of the wavelength vectors *blue*-shifted according to the velocities. This means that for each component, the arrays are flattened into 1D vectors.
+    '''
+
+    n_epochs_lwl = len(lwls.shape)
+    n_components, n_epochs = velocities.shape
+    assert n_epochs_lwl == n_epochs, "There is a mismatch between the number of epochs implied by the log-wavelength vector ({:}) and the number of epochs implied by the orbital velocities {:}".format(n_epochs_lwl, n_epochs)
+
+    if mask is None:
+        mask = np.ones_like(lwl, dytpe=np.bool)
+
+    n_good_pix = np.sum(mask)
+
+    lwls_out = np.empty((n_components, n_good_pix), dtype=np.float64)
+    for i in range(n_components):
+        lwls_out[i] = lredshift(lwls, (-velocities[i][:,np.newaxis] * np.ones_like(mask))[mask])
+
+    return lwls_out
 
 class Spectrum:
+    '''
+    Data structure for the raw spectra, stored in an HDF5 file.
+
+    This is the main datastructure used to interact with your dataset. The key is getting your spectra into an HDF5 format first.
+
+    Args:
+        fname (string): location of the HDF5 file.
+
+    Returns:
+        Spectrum: the instantiated Spectrum object.
+    '''
+
     def __init__(self, fname):
-        '''
-        Data structure for the raw spectra, stored in an HDF5 file.
 
-        This is the main datastructure used to interact with your dataset. The key is getting your spectra into an HDF5 format first.
-
-        Args:
-            fname (string): location of the HDF5 file.
-
-        Returns:
-            Spectrum: the Spectrum object.
-        '''
 
         data = h5py.File(fname,'r')
 
