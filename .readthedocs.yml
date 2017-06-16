@@ -1,0 +1,5 @@
+name: psoap
+
+python:
+  setup_py_install: true
+  version: 3.5

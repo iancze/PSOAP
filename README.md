@@ -1,7 +1,7 @@
 # PSOAP
 Pronounced "soap."
 
-![documentation status](http://psoap.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/psoap/badge/?version=latest)](http://psoap.readthedocs.io/en/latest/?badge=latest)
 
 Precision Spectroscopic Orbits A-Parametrically
 
