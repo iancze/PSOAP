@@ -3,7 +3,7 @@
 import argparse
 
 parser = argparse.ArgumentParser(description="Go through the chunks.dat file and segment the dataset into chunks.")
-parser.add_argument("--plot", action="store_true", help="Make plots of the applied masks.")
+parser.add_argument("--plot", action="store_true", help="Make plots of the partitioned chunks.")
 args = parser.parse_args()
 
 

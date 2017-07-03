@@ -72,7 +72,7 @@ def predict_python(wl_known, fl_known, sigma_known, wl_predict, amp_f, l_f, mu_G
     return (mu, Sigma)
 
 
-def predict_f_g(lwl_f, lwl_g, fl_fg, sigma_fg, lwl_f_predict, lwl_g_predict, mu_f, amp_f, l_f, mu_g, amp_g, l_g):
+def predict_f_g(lwl_f, lwl_g, fl_fg, sigma_fg, lwl_f_predict, lwl_g_predict, mu_f, amp_f, l_f, mu_g, amp_g, l_g, get_Sigma=True):
     '''
     Given that f + g is the flux that we're modeling, jointly predict the components.
     '''
@@ -132,9 +132,14 @@ def predict_f_g(lwl_f, lwl_g, fl_fg, sigma_fg, lwl_f_predict, lwl_g_predict, mu_
     # print("Sloving for mu, sigma")
     # the 1.0 signifies that mu_f + mu_g = mu_fg = 1
     mu = mu_cat + np.dot(C, cho_solve((factor, flag), fl_fg - 1.0))
-    Sigma = A - np.dot(C, cho_solve((factor, flag), C.T))
 
-    return mu, Sigma
+    if get_Sigma:
+        Sigma = A - np.dot(C, cho_solve((factor, flag), C.T))
+
+        return mu, Sigma
+
+    else:
+        return mu
 
 
 def predict_f_g_sum(lwl_f, lwl_g, fl_fg, sigma_fg, lwl_f_predict, lwl_g_predict, mu_fg, amp_f, l_f, amp_g, l_g):
@@ -454,9 +459,6 @@ def determine_all_velocities(chunk, log_sigma, log_rho, mu_GP=1.0):
 
     return velocities
 
-
-# New (as of 4/4/17) routine to incorporate more complex covariance matrices in the optimization routine, which can incorporate orbital motion.
-
 # uses smart inverse from Celerite
 def optimize_calibration_ST1(lwl0, lwl1, lwl_cal, fl_cal, fl_fixed, gp, A, C, mu_GP=1.0, order=1):
     '''
@@ -523,24 +525,21 @@ def optimize_calibration_ST1(lwl0, lwl1, lwl_cal, fl_cal, fl_fixed, gp, A, C, mu
 
 def optimize_calibration(lwl0, lwl1, lwl_cal, fl_cal, fl_fixed, A, B, C, order=1, mu_GP=1.0):
     '''
-    Determine the calibration parameters for this epoch of observations.
+    Determine the calibration parameters for this epoch of observations. This is a more general method than :py:meth:`psoap.covariance.optimize_calibration_static`, since it allows arbitrary covariance matrices, which should be used when there is orbital motion. Assumes that covariance matrices are appropriately filled out.
 
-    lwl0, lwl1: set the points for the Chebyshev.
+    Args:
+        lwl0 (float) : left side evaluation point for Chebyshev
+        lwl1 (float) : right side evaluation point for Chebyshev
+        lwl_cal (np.array): the wavelengths corresponding to the epoch we want to calibrate
+        fl_cal (np.array): the fluxes corresponding to the epoch we want to calibrate
+        fl_fixed (np.array): the remaining epochs of data to calibrate in reference to.
+        A (2D np.array) : matrix_functions.fill_V11_f(A, lwl_cal, amp, l_f) with sigma_cal already added to the diagonal
+        B (2D np.array) : matrix_functions.fill_V11_f(B, lwl_fixed, amp, l_f) with sigma_fixed already added to the diagonal
+        C (2D np.array): matrix_functions.fill_V12_f(C, lwl_cal, lwl_fixed, amp, l_f) cross matrix (with no sigma added, since these are independent measurements).
+        order (int): the degree polynomial to use. order = 1 is a line, order = 2 is a line + parabola
 
-    This is a more general method than optimize_calibration_static, since it allows arbitrary covariance matrices, which should be used when there is orbital motion.
-
-    lwl_cal: the wavelengths corresponding to the epoch we want to calibrate
-    fl_cal: the fluxes corresponding to the epoch we want to calibrate
-
-    fl_fixed: the remaining epochs of data to calibrate in reference to.
-
-    A : matrix_functions.fill_V11_f(A, lwl_cal, amp, l_f) with sigma_cal already added to the diagonal
-    B : matrix_functions.fill_V11_f(B, lwl_fixed, amp, l_f) with sigma_fixed already added to the diagonal
-    C : matrix_functions.fill_V12_f(C, lwl_cal, lwl_fixed, amp, l_f) cross matrix (with no sigma added, since these are independent measurements).
-
-    order: the degree polynomial to use. order = 1 is a line, order = 2 is a line + parabola
-
-    Assumes that covariance matrices are appropriately filled out.
+    Returns:
+        (np.array, np.array): a tuple of two data products. The first is the ``fl_cal`` vector, now calibrated. The second is the array of the Chebyshev coefficients, in case one wants to re-evaluate the calibration polynomials.
     '''
 
     # basically, assume that A, B, and C are already filled out.
@@ -591,15 +590,27 @@ def optimize_calibration(lwl0, lwl1, lwl_cal, fl_cal, fl_fixed, A, B, C, order=1
     return fl_cor, X
 
 
-# Previous optimize calibration routine that assumed that relative velocities between all epochs were zero.
+
 def optimize_calibration_static(wl0, wl1, wl_cal, fl_cal, sigma_cal, wl_fixed, fl_fixed, sigma_fixed, amp, l_f, order=1, mu_GP=1.0):
     '''
-    Determine the calibration parameters for this epoch of observations.
-    Assumes all wl, fl arrays are 1D.
+    Determine the calibration parameters for this epoch of observations. Assumes all wl, fl arrays are 1D, and that the relative velocities between all epochs are zero.
 
-    order is the Chebyshev order to use.
+    Args:
+        wl0 (float) : left wl point to evaluate the Chebyshev
+        wl1 (float) : right wl point to evaluate the Chebyshev
+        wl_cal (np.array) : the wavelengths of the epoch to calibrate
+        fl_cal (np.array) : the fluxes of the epoch to calibrate
+        sigma_cal (np.array): the sigmas of the epoch to calibrate
+        wl_fixed (np.array) : the 1D (flattened) array of the reference wavelengths
+        fl_fixed (np.array) : the 1D (flattened) array of the reference fluxes
+        sigma_fixed (np.array) : the 1D (flattened) array of the reference sigmas
+        amp (float): the GP amplitude
+        l_f (float): the GP length
+        order (int): the Chebyshev order to use
+        mu_GP (optional): the mean of the GP to assume.
 
-    returns a corrected fl_cal, as well as c0 and c1
+    Returns:
+        (np.array, np.array): a tuple of two data products. The first is the ``fl_cal`` vector, now calibrated. The second is the array of the Chebyshev coefficients, in case one wants to re-evaluate the calibration polynomials.
     '''
 
     N_A = len(wl_cal)

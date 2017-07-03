@@ -39,7 +39,8 @@ print("Last sample is ")
 # that can be easily copied and pasted into the new file.
 convert_vector_p = partial(utils.convert_vector, model=config["model"], fix_params=config["fix_params"], **config["parameters"])
 reg_params = utils.registered_params[config["model"]]
-last_sample = convert_vector_p(flatchain[-1])
+p_orb, p_gp = convert_vector_p(flatchain[-1])
+last_sample = np.concatenate((p_orb, p_gp))
 for (name, sample) in zip(reg_params, last_sample):
     print(name, ":", sample)
 

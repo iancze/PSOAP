@@ -52,7 +52,7 @@ orb = orbit.models[config["model"]](**pars, obs_dates=dates)
 
 
 def get_orbit_SB1(p):
-    K, e, omega, P, T0, gamma, amp_f, l_f = convert_vector_p(p)
+    (K, e, omega, P, T0, gamma), (amp_f, l_f) = convert_vector_p(p)
 
     if K < 0.0 or e < 0.0 or e > 1.0 or P < 0.0 or omega < -180 or omega > 520 or amp_f < 0.0 or l_f < 0.0:
         raise RuntimeError
@@ -73,7 +73,7 @@ def get_orbit_SB1(p):
 
 def get_orbit_SB2(p):
     # unroll p
-    q, K, e, omega, P, T0, gamma, amp_f, l_f, amp_g, l_g = convert_vector_p(p)
+    (q, K, e, omega, P, T0, gamma), (amp_f, l_f, amp_g, l_g) = convert_vector_p(p)
 
     if q < 0.0 or K < 0.0 or e < 0.0 or e > 1.0 or P < 0.0 or omega < -180 or omega > 520 or amp_f < 0.0 or l_f < 0.0 or amp_g < 0.0 or l_g < 0.0 :
         raise RuntimeError
@@ -88,8 +88,8 @@ def get_orbit_SB2(p):
     orb.gamma = gamma
 
     # predict velocities for each epoch
-    vAs, vBs = orb.get_component_velocities()
-    vAs_fine, vBs_fine = orb.get_component_velocities(dates_fine)
+    vAs, vBs = orb.get_velocities()
+    vAs_fine, vBs_fine = orb.get_velocities(dates_fine)
 
     return (vAs, vAs_fine, vBs, vBs_fine)
 
@@ -163,7 +163,7 @@ elif config["model"] == "SB2":
 
     for p in flatchain:
         vAs, vAs_fine, vBs, vBs_fine = get_orbit_SB2(p)
-        q, K, e, omega, P, T0, gamma, amp_f, l_f, amp_g, l_g = convert_vector_p(p)
+        (q, K, e, omega, P, T0, gamma), (amp_f, l_f, amp_g, l_g) = convert_vector_p(p)
 
         phase = ((dates - T0) % P) / P
         phase_fine = ((dates_fine - T0) % P) / P

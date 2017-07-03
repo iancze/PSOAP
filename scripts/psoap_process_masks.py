@@ -37,6 +37,9 @@ masks = ascii.read(config["mask_file"])
 print("Appyling the following masks")
 print(masks)
 
+
+
+
 # go through each chunk, search all masks to build up a total mask, then re-save that chunk
 def process_chunk(chunk):
     order, wl0, wl1 = chunk
@@ -49,6 +52,11 @@ def process_chunk(chunk):
     date = chunkSpec.date
     # print("date", date)
     date1D = chunkSpec.date1D
+
+    # limit?
+    limit = config["epoch_limit"]
+    if limit > chunkSpec.n_epochs:
+        limit = chunkSpec.n_epochs
 
     # start with a full mask (all points included)
     mask = np.ones_like(chunkSpec.wl, dtype="bool")
@@ -71,8 +79,20 @@ def process_chunk(chunk):
 
     if args.plot:
         plots_dir = "plots_" + C.chunk_fmt.format(order, wl0, wl1)
+
+        # also redo the plot with every epoch the same
+        fig, ax = plt.subplots(nrows=1, sharex=True)
+
+        # Plot in reverse order so that highest S/N spectra are on top
+        for i in range(limit)[::-1]:
+            ax.plot(wl[i], fl[i])
+            ax.plot(wl[i][~mask[i]], fl[i][~mask[i]], color="r")
+
+        ax.set_xlabel(r"$\lambda\quad[\AA]$")
+        fig.savefig(C.chunk_fmt.format(order, wl0, wl1) + ".png", dpi=300)
+
         # Go through and re-plot the chunks with highlighted mask points.
-            # plot these relative to the highest S/N flux, so we know what looks suspicious, and what to mask.
+        # plot these relative to the highest S/N flux, so we know what looks suspicious, and what to mask.
         for i in range(chunkSpec.n_epochs):
             fig, ax = plt.subplots(nrows=1)
             ax.plot(wl[0], fl[0], color="0.5")
