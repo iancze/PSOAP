@@ -6,6 +6,7 @@ parser = argparse.ArgumentParser(description="Make summary plots for a full HDF5
 parser.add_argument("--orders", help="Which orders to plot. By default, all orders are plotted. Can add more than one order in a spaced list, e.g., --orders 22 23 24 but not --orders=22,23,24", default="all", nargs="*")
 parser.add_argument("--SNR", action="store_true", help="Plot spectra in order of highest SNR first, instead of by date. Default is by date.")
 parser.add_argument("--topo", action="store_true", help="Plot spectra in topocentric frame instead of barycentric frame. Default is barycentric frame.")
+parser.add_argument("--spacing", type=float, default=1, help="Multiply the default vertical spacing between epochs by this value")
 
 args = parser.parse_args()
 
@@ -23,6 +24,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from psoap.data import Spectrum, redshift
+import psoap.constants as C
 
 
 # Load the spectrum
@@ -69,7 +71,7 @@ if args.topo:
 
 
 # Set up some plot constants
-dy_per_epoch = 0.5 # in
+dy_per_epoch = 0.5 * args.spacing # in
 
 for order in orders:
     # Create a specific director for the order, if it doesn't exist.
@@ -104,7 +106,7 @@ for order in orders:
     ax.annotate("SNR", (x1_annotate, 1.4 + 0.4 * n_epochs), color='k', ha="center", va="center", size=8)
 
     for i in range(n_epochs):
-        offset = 0.4
+        offset = 0.4 * args.spacing
         pedastal = offset * n_epochs
         p = ax.plot(wls[i,order,:], fls[i,order,:] + (pedastal - offset * i))
         color = p[0].get_color() # the color of the line we just plotted

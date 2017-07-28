@@ -1,30 +1,71 @@
+r'''
+Orbital conventions derived according to
+
+.. math::
+
+    \Delta \delta = X = \rho \cos \theta \\
+    \Delta \alpha \cos \delta = Y = \rho \sin \theta
+
+The positive X-axis points North, and the positive Y-axis points East. Rotation angle :math:`\theta` is measured in degrees East of North, i.e.
+
+.. math::
+
+    \theta = \arctan(Y / X).
+
+In our implementation, we use ``np.atan2(Y/X)`` to resolve the quadrant ambiguity.
+
+The *ascending node* is defined as the point where the *secondary* crosses the plane of the sky *receeding* from the observer. It is measured in degrees East of North.
+
+Inclination is defined such that :math:`0 < i < \pi/2` yield prograde orbits (counter-clockwise, such that :math:`\theta` increases), and :math:`\pi/2 < i < \pi` yield retrograde orbits (clockwise, such that :math:`\theta` decreases).
+
+These lead to the following equations of motion
+
+.. math::
+
+    X = r (\cos \Omega \cos(\omega + f) - \sin(\Omega) \sin(\omega + f) \cos(i)) \\
+    Y = r (\sin \Omega \cos(\omega + f) + \cos(\Omega) \sin(\omega + f) \cos(i)) \\
+    Z = - r \sin(\omega + f) \sin(i)
+
+and
+
+.. math::
+
+    v_{r,1} = K_1 (\cos (\omega_1 + f) + e \cos \omega_1) \\
+    v_{r,2} = K_2 (\cos (\omega_2 + f) + e \cos \omega_2).
+
+'''
+
 import numpy as np
 from scipy.optimize import fsolve
 
 from psoap import constants as C
 
+
 class Binary:
     '''
-    Binary orbital model that can deliver absolute astrometric position, relative astrometric position (B relative to A), and radial velocities for A and B.
+    Binary orbital model that can deliver absolute astrometric position,
+    relative astrometric position (B relative to A), and radial velocities for A and B.
 
     Args:
         a (float): semi-major axis [AU]
         e (float): eccentricity (must be between ``[0.0, 1.0)``)
         i (float): inclination [deg]
-        omega (float): argument of periastron [degrees]
-        Omega (float): position angle of the ascending node [deg] east of north
+        omega (float): argument of periastron of the *primary*, i.e. :math:`\omega_1` [degrees]
+        Omega (float): position angle of the ascending node (going into sky) [deg] east of north
         T0 (float): epoch of periastron passage [JD]
-        M_tot (float): sum of the masses [M_sun]
-        M_2 (float): mass of B [M_sun]
+        M_tot (float): sum of the masses [:math:`M_\odot`]
+        M_2 (float): mass of B [:math:`M_\odot`]
         gamma (float): systemic velocity (km/s)
         obs_dates (1D np.array): dates of observation (JD)
     '''
+
     def __init__(self, a, e, i, omega, Omega, T0, M_tot, M_2, gamma, obs_dates=None, **kwargs):
         assert (e >= 0.0) and (e < 1.0), "Eccentricity must be between [0, 1)"
         self.a = a # [AU] semi-major axis
         self.e = e # eccentricity
         self.i = i # [deg] inclination
         self.omega = omega # [deg] argument of periastron
+        self.omega_2 = self.omega + 180
         self.Omega = Omega # [deg] east of north
         self.T0 = T0 # [JD]
         self.M_tot = M_tot # [M_sun]
@@ -72,9 +113,9 @@ class Binary:
         '''Calculate the component of B's velocity based on only the inner orbit.
         f is the true anomoly of this inner orbit.'''
 
-        return -self.K/self.q * (np.cos(self.omega * np.pi/180 + f) + self.e * np.cos(self.omega * np.pi/180))
+        return self.K/self.q * (np.cos(self.omega_2 * np.pi/180 + f) + self.e * np.cos(self.omega_2 * np.pi/180))
 
-    # Get the position of A in the plane of the orbit
+    # Get the position of A in the plane of the orbit, relative to the center of mass
     def _xy_A(self, f):
         # find the reduced radius
         r = self.a * (1 - self.e**2) / (1 + self.e * np.cos(f)) # [AU]
@@ -85,19 +126,20 @@ class Binary:
 
         return (x,y)
 
-    # Get the position of B in the plane of the orbit
+    # Get the position of B in the plane of the orbit, relative to the center of mass
     def _xy_B(self, f):
         # find the reduced radius
-        r = self.a * (1 - self.e**2) / (1 + self.e * np.cos(f)) # [AU]
-        r2 = -r * (self.M_tot - self.M_2) / self.M_tot # [AU]
+        r = self.a * (1 - self.e**2) / (1 + self.e * np.cos(f)) #
+        r2 = r * (self.M_tot - self.M_2) / self.M_tot # [AU]
 
         x = r2 * np.cos(f)
         y = r2 * np.sin(f)
 
         return (x,y)
 
+    # Get the position of B in the plane of the orbit, relative to A
     def _xy_AB(self, f):
-        r = self.a * (1 - self.e**2) / (1 + self.e * np.cos(f)) # [AU]
+        r = self.a * (1 - self.e**2) / (1 + self.e * np.cos(f)) # [AU] # Negative sign here because we want B rel to A
         x = r * np.cos(f)
         y = r * np.sin(f)
 
@@ -111,42 +153,62 @@ class Binary:
         r1 = r * self.M_2 / self.M_tot # [AU]
 
         Omega = self.Omega * np.pi / 180
-        omega = self.omega * np.pi / 180 # add in pi to swap the periapse
+        omega = self.omega * np.pi / 180
         i = self.i * np.pi / 180
         X = r1 * (np.cos(Omega) * np.cos(omega + f) - np.sin(Omega) * np.sin(omega + f) * np.cos(i))
         Y = r1 * (np.sin(Omega) * np.cos(omega + f) + np.cos(Omega) * np.sin(omega + f) * np.cos(i))
-        Z = r1 * (np.sin(omega + f) * np.sin(i))
+        Z = -r1 * (np.sin(omega + f) * np.sin(i))
 
         return (X, Y, Z) # [AU]
 
     # position of B relative to center of mass
     def _XYZ_B(self, f):
-
         # find the reduced radius
         r = self.a * (1 - self.e**2) / (1 + self.e * np.cos(f)) # [AU]
-        r2 = -r * (self.M_tot - self.M_2) / self.M_tot # [AU]
+        r2 = r * (self.M_tot - self.M_2) / self.M_tot # [AU]
 
         Omega = self.Omega * np.pi / 180
-        omega = self.omega * np.pi / 180
+        omega = self.omega_2 * np.pi / 180
         i = self.i * np.pi / 180
         X = r2 * (np.cos(Omega) * np.cos(omega + f) - np.sin(Omega) * np.sin(omega + f) * np.cos(i))
         Y = r2 * (np.sin(Omega) * np.cos(omega + f) + np.cos(Omega) * np.sin(omega + f) * np.cos(i))
-        Z = r2 * (np.sin(omega + f) * np.sin(i))
+        Z = -r2 * (np.sin(omega + f) * np.sin(i))
 
         return (X, Y, Z) # [AU]
 
     def _XYZ_AB(self, f):
         # radius of B to A
-        r = self.a * (1 - self.e**2) / (1 + self.e * np.cos(f)) # [AU]
+        r = self.a * (1 - self.e**2) / (1 + self.e * np.cos(f))
         Omega = self.Omega * np.pi / 180
-        omega = self.omega * np.pi / 180
+        omega = self.omega_2 * np.pi / 180
         i = self.i * np.pi / 180
         X = r * (np.cos(Omega) * np.cos(omega + f) - np.sin(Omega) * np.sin(omega + f) * np.cos(i))
         Y = r * (np.sin(Omega) * np.cos(omega + f) + np.cos(Omega) * np.sin(omega + f) * np.cos(i))
-        Z = r * (np.sin(omega + f) * np.sin(i))
+        Z = -r * (np.sin(omega + f) * np.sin(i))
 
-        # X is north, Y is east.
         return (X, Y, Z) # [AU]
+
+    def _get_periastron_A(self):
+        return np.array(self._XYZ_A(0))
+
+    def _get_periastron_B(self):
+        return np.array(self._XYZ_B(0))
+
+    def _get_periastron_BA(self):
+        return np.array(self._XYZ_AB(0))
+
+    def _get_node_A(self):
+        '''
+        The point corresponding to the ascending node
+        '''
+        # set f = 2 * pi - omega
+        return np.array(self._XYZ_A(2 * np.pi - self.omega * np.pi/180))
+
+    def _get_node_B(self):
+        return np.array(self._XYZ_B(2 * np.pi - self.omega_2 * np.pi/180))
+
+    def _get_node_BA(self):
+        return np.array(self._XYZ_AB(2 * np.pi - self.omega_2 * np.pi/180))
 
     def _get_orbit_t(self, t):
         '''
@@ -172,15 +234,15 @@ class Binary:
 
 
     def get_orbit(self, dates=None):
-        '''
+        r'''
         Deliver only the main quantities useful for performing a joint astrometric + RV fit to real data, namely
-        the radial velocities ``vA``, ``vB``, the relative offsets ``rho_AB``, and relative position angles ``theta_AB``, for all dates provided. Relative offsets are provided in AU, and so must be converted to arcseconds after assuming a distance to the system. Relative position angles are given in degrees east of north.
+        the radial velocities ``vA``, ``vB``, the relative offsets :math:`\rho`, and relative position angles :math:`\theta`, for all dates provided. Relative offsets are provided in AU, and so must be converted to arcseconds after assuming a distance to the system. Relative position angles are given in degrees east of north.
 
         Args:
             dates (optional): if provided, calculate quantities at this new vector of dates, rather than the one provided when the object was initialized.
 
         Returns:
-            np.array: A ``(4, npoints)`` shape array of ``[vA, vB, rho_AB, theta_AB]``
+            dict: A dictionary with items ``"vAs"``, ``"vBs"``, ``"rhos"``, ``"thetas"``.
         '''
 
         if dates is None and self.obs_dates is None:
@@ -206,14 +268,14 @@ class Binary:
             X, Y, Z = XYZ_AB
 
             rho = np.sqrt(X**2 + Y**2) # [AU]
-            theta = np.arctan2(Y, X) * 180/np.pi # [Deg]
+            theta = np.arctan2(Y,X) * 180/np.pi # [Deg]
             if theta < 0: # ensure that 0 <= theta <= 360
                 theta += 360.
 
             rho_ABs[i] = rho
             theta_ABs[i] = theta
 
-        return np.vstack((vAs, vBs, rho_ABs, theta_ABs))
+        return {"vAs":vAs, "vBs":vBs, "rhos":rho_ABs, "thetas":theta_ABs}
 
     def get_full_orbit(self, dates=None):
         '''
@@ -224,7 +286,7 @@ class Binary:
             dates (optional): if provided, calculate quantities at this new vector of dates, rather than the one provided when the object was initialized.
 
         Returns:
-            np.array: A ``(8, npoints)`` shape array of ``[vA, vB, XYZ_A, XYZ_B, XYZ_AB, xy_A, xy_B, xy_AB]``
+            dict: A dictionary with items of ``"vAs"``, ``"vBs"``, ``"XYZ_As"``, ``"XYZ_Bs"``, ``"XYZ_ABs"``, ``"xy_As"``, ``"xy_Bs"``, ``"xy_ABs"``
         '''
 
 
@@ -247,7 +309,7 @@ class Binary:
         xy_ABs = np.empty((N, 2), dtype=np.float64)
 
         for i,date in enumerate(dates):
-            vA, vB, XY_A, XY_B, XY_AB, xy_A, xy_B, xy_AB = self._get_orbit_t(date)
+            vA, vB, XYZ_A, XYZ_B, XYZ_AB, xy_A, xy_B, xy_AB = self._get_orbit_t(date)
             vAs[i] = vA
             vBs[i] = vB
             XYZ_As[i] = np.array(XYZ_A)
@@ -257,8 +319,8 @@ class Binary:
             xy_Bs[i] = np.array(xy_B)
             xy_ABs[i] = np.array(xy_AB)
 
-
-        return (vAs, vBs, XYZ_As, XYZ_Bs, XYZ_ABs, xy_As, xy_Bs, xy_ABs)
+        return {"vAs":vAs, "vBs":vBs, "XYZ_As":XYZ_As, "XYZ_Bs":XYZ_Bs,
+        "XYZ_ABs":XYZ_ABs, "xy_As":xy_As, "xy_Bs":xy_Bs, "xy_ABs":xy_ABs}
 
 
 class Triple:
@@ -269,18 +331,18 @@ class Triple:
         a_in (float): semi-major axis for inner orbit [AU]
         e_in (float): eccentricity for inner orbit (must be between ``[0.0, 1.0)``)
         i_in (float): inclination for inner orbit [deg]
-        omega_in (float): argument of periastron for inner orbit [degrees]
+        omega_in (float): argument of periastron for inner orbit, for the primary (:math:`\omega_1`) [degrees]
         Omega_in (float): position angle of the ascending node [deg] east of north for inner orbit
         T0_in (float): epoch of periastron passage for inner orbit [JD]
         a_out (float): semi-major axis for outer orbit [AU]
         e_out (float): eccentricity for outer orbit (must be between ``[0.0, 1.0)``)
         i_out (float): inclination for outer orbit [deg]
-        omega_out (float): argument of periastron for outer orbit [degrees]
+        omega_out (float): argument of periastron for outer orbit, for the "primary" (:math:`\omega_{12}`) [degrees]
         Omega_out (float): position angle of the ascending node [deg] east of north for outer orbit
         T0_out (float): epoch of periastron passage for outer orbit [JD]
-        M_1 (float): mass of A [M_sun]
-        M_2 (float): mass of B [M_sun]
-        M_3 (float): mass of C [M_sun]
+        M_1 (float): mass of A [:math:`M_\odot`]
+        M_2 (float): mass of B [:math:`M_\odot`]
+        M_3 (float): mass of C [:math:`M_\odot`]
         gamma (float): systemic velocity (km/s)
         obs_dates (1D np.array): dates of observation (JD)
     '''
@@ -291,12 +353,14 @@ class Triple:
         self.e_in = e_in #
         self.i_in = i_in # [deg]
         self.omega_in = omega_in # [deg]
+        self.omega_in_2 = omega_in + 180
         self.Omega_in = Omega_in # [deg]
         self.T0_in = T0_in # [JD]
         self.a_out = a_out # [AU]
         self.e_out = e_out
         self.i_out = i_out # [deg]
         self.omega_out = omega_out # [deg]
+        self.omega_out_2 = omega_out + 180
         self.Omega_out = Omega_out # [deg]
         self.T0_out = T0_out # [JD]
         self.M_1 = M_1 # [M_sun]
@@ -366,7 +430,7 @@ class Triple:
         '''Calculate the component of B's velocity based on only the inner orbit.
         f is the true anomoly of this inner orbit.'''
 
-        return -self.K_in * self.M_1/self.M_2 * (np.cos(self.omega_in * np.pi/180 + f) + self.e_in * np.cos(self.omega_in * np.pi/180))
+        return self.K_in * self.M_1/self.M_2 * (np.cos(self.omega_in_2 * np.pi/180 + f) + self.e_in * np.cos(self.omega_in_2 * np.pi/180))
 
 
     def _v3_f(self, f):
@@ -379,7 +443,7 @@ class Triple:
         '''Calculate the velocity of C based only on the outer orbit.
         f is the true anomoly of the outer orbit
         '''
-        return -self.K_out * (self.M_1 + self.M_2)/ self.M_3 * (np.cos(self.omega_out * np.pi/180 + f) + self.e_out * np.cos(self.omega_out * np.pi/180))
+        return self.K_out * (self.M_1 + self.M_2)/ self.M_3 * (np.cos(self.omega_out_2 * np.pi/180 + f) + self.e_out * np.cos(self.omega_out_2 * np.pi/180))
 
     # absolute position of the AB center of mass in the plane of the orbit
     def _xy_AB(self, f):
@@ -396,14 +460,14 @@ class Triple:
     def _xy_C(self, f):
         # find the reduced radius
         r = self.a_out * (1 - self.e_out**2) / (1 + self.e_out * np.cos(f)) # [AU]
-        r2 = -r * (self.M_1 + self.M_2) / (self.M_1 + self.M_2 + self.M_3) # [AU]
+        r2 = r * (self.M_1 + self.M_2) / (self.M_1 + self.M_2 + self.M_3) # [AU]
 
         x = r2 * np.cos(f)
         y = r2 * np.sin(f)
 
         return (x,y)
 
-    # absolute position of AB center of mass
+    # absolute position of AB center of mass relative to center of mass of entire system.
     def _XYZ_AB(self, f):
 
         # find the reduced radius
@@ -415,23 +479,23 @@ class Triple:
         i = self.i_out * np.pi / 180
         X = r1 * (np.cos(Omega) * np.cos(omega + f) - np.sin(Omega) * np.sin(omega + f) * np.cos(i))
         Y = r1 * (np.sin(Omega) * np.cos(omega + f) + np.cos(Omega) * np.sin(omega + f) * np.cos(i))
-        Z = r1 * (np.sin(omega + f) * np.sin(i))
+        Z = -r1 * (np.sin(omega + f) * np.sin(i))
 
         return (X, Y, Z) # [AU]
 
-    # absolute position of C
+    # absolute position of C relative to center of mass of entire system
     def _XYZ_C(self, f):
 
         # find the reduced radius
         r = self.a_out * (1 - self.e_out**2) / (1 + self.e_out * np.cos(f)) # [AU]
-        r2 = -r * (self.M_1 + self.M_2) / (self.M_1 + self.M_2 + self.M_3) # [AU]
+        r2 = r * (self.M_1 + self.M_2) / (self.M_1 + self.M_2 + self.M_3) # [AU]
 
         Omega = self.Omega_out * np.pi / 180
-        omega = self.omega_out * np.pi / 180
+        omega = self.omega_out_2 * np.pi / 180
         i = self.i_out * np.pi / 180
         X = r2 * (np.cos(Omega) * np.cos(omega + f) - np.sin(Omega) * np.sin(omega + f) * np.cos(i))
         Y = r2 * (np.sin(Omega) * np.cos(omega + f) + np.cos(Omega) * np.sin(omega + f) * np.cos(i))
-        Z = r2 * (np.sin(omega + f) * np.sin(i))
+        Z = -r2 * (np.sin(omega + f) * np.sin(i))
 
         return (X, Y, Z) # [AU]
 
@@ -451,7 +515,7 @@ class Triple:
     def _xy_B_loc(self, f):
         # find the reduced radius
         r = self.a_in * (1 - self.e_in**2) / (1 + self.e_in * np.cos(f)) # [AU]
-        r2 = -r * self.M_1 / (self.M_1 + self.M_2) # [AU]
+        r2 = r * self.M_1 / (self.M_1 + self.M_2) # [AU]
 
         x = r2 * np.cos(f)
         y = r2 * np.sin(f)
@@ -466,11 +530,11 @@ class Triple:
         r1 = r * self.M_2 / (self.M_1 + self.M_2) # [AU]
 
         Omega = self.Omega_in * np.pi / 180
-        omega = self.omega_in * np.pi / 180 # add in pi to swap the periapse
+        omega = self.omega_in * np.pi / 180
         i = self.i_in * np.pi / 180
         X = r1 * (np.cos(Omega) * np.cos(omega + f) - np.sin(Omega) * np.sin(omega + f) * np.cos(i))
         Y = r1 * (np.sin(Omega) * np.cos(omega + f) + np.cos(Omega) * np.sin(omega + f) * np.cos(i))
-        Z = r1 * (np.sin(omega + f) * np.sin(i))
+        Z = -r1 * (np.sin(omega + f) * np.sin(i))
 
         return (X, Y, Z) # [AU]
 
@@ -479,14 +543,14 @@ class Triple:
 
         # find the reduced radius
         r = self.a_in * (1 - self.e_in**2) / (1 + self.e_in * np.cos(f)) # [AU]
-        r2 = -r * self.M_1 / (self.M_1 + self.M_2) # [AU]
+        r2 = r * self.M_1 / (self.M_1 + self.M_2) # [AU]
 
         Omega = self.Omega_in * np.pi / 180
-        omega = self.omega_in * np.pi / 180
+        omega = self.omega_in_2 * np.pi / 180
         i = self.i_in * np.pi / 180
         X = r2 * (np.cos(Omega) * np.cos(omega + f) - np.sin(Omega) * np.sin(omega + f) * np.cos(i))
         Y = r2 * (np.sin(Omega) * np.cos(omega + f) + np.cos(Omega) * np.sin(omega + f) * np.cos(i))
-        Z = r2 * (np.sin(omega + f) * np.sin(i))
+        Z = -r2 * (np.sin(omega + f) * np.sin(i))
 
         return (X, Y, Z) # [AU]
 
@@ -530,15 +594,15 @@ class Triple:
 
 
     def get_orbit(self, dates=None):
-        '''
+        r'''
         Deliver only the main quantities useful for performing a joint astrometric + RV fit to real data, namely
-        the radial velocities ``vA``, ``vB``, ``vC``, the relative offsets of B to A ``rho_AB``, and relative position angles ``theta_AB``, and the relative offsets of C to A ``rho_AC`` and ``theta_AC`` for all dates provided. Relative offsets are provided in AU, and so must be converted to arcseconds after assuming a distance to the system. Relative position angles are given in degrees east of north.
+        the radial velocities :math:`v_{r,A}`, :math:`v_{r,B}`, :math:`v_{r,C}`, the relative offsets of B to A :math:`\rho_\mathrm{AB}`, and relative position angles :math:`\theta_\mathrm{AB}`, and the relative offsets of C to A :math:`\rho_\mathrm{AC}` and :math:`\theta_\mathrm{AC}` for all dates provided. Relative offsets are provided in AU, and so must be converted to arcseconds after assuming a distance to the system. Relative position angles are given in degrees east of north.
 
         Args:
             dates (optional): if provided, calculate quantities at this new vector of dates, rather than the one provided when the object was initialized.
 
         Returns:
-            np.array: A ``(7, npoints)`` shape array of ``[vAs, vBs, vCs, rho_ABs, theta_ABs, rho_ACs, theta_ACs]``
+            dict: A dictionary with keys ``"vAs"``, ``"vBs"``, ``"vCs"``, ``"rho_ABs"``, ``"theta_ABs"``, ``"rho_ACs"``, ``"theta_ACs"``
         '''
 
         if dates is None and self.obs_dates is None:
@@ -591,18 +655,18 @@ class Triple:
             rho_ACs[i] = rho_AC
             theta_ACs[i] = theta_AC
 
-        return np.vstack((vAs, vBs, vCs, rho_ABs, theta_ABs, rho_ACs, theta_ACs))
+        return {"vAs":vAs, "vBs":vBs, "vCs":vCs, "rho_ABs":rho_ABs, "theta_ABs":theta_ABs, "rho_ACs":rho_ACs, "theta_ACs":theta_ACs}
 
     def get_full_orbit(self, dates=None):
         '''
         Deliver the full set of astrometric and radial velocity quantities, namely
-        the radial velocities ``vA``, ``vB``, ``vC``, the position of A, B, and C relative to the center of mass in the plane of the sky (``XY_A``, ``XY_B``, and ``XY_C``, respectively), the absolute position of the center of mass of (AB), (``XY_AB``), the position of A relative to the center of mass of AB (``XY_A_loc``), the position of B relative to the center of mass of (AB) (``XY_B_loc``), the absolute position of C in the plane of the orbit (``xy_C``), the absolute positon of the center of mass of AB in the plane of the orbit (``xy_AB``), the position of A in the plane of the orbit, relative to the center of mass of AB (``xy_A``), and the position of B in the plane of the orbit, relative to the center of mass of AB (``xy_B``), for all dates provided. All positions are given in units of AU, and so must be converted to arcseconds after assuming a distance to the system.
+        the radial velocities :math:`v_{r,A}`, :math:`v_{r,B}`, :math:`v_{r,C}`, the position of A, B, and C relative to the center of mass in the plane of the sky (``XYZ_A``, ``XYZ_B``, and ``XYZ_C``, respectively), the absolute position of the center of mass of (AB), (``XYZ_AB``), the position of A relative to the center of mass of AB (``XYZ_A_loc``), the position of B relative to the center of mass of (AB) (``XYZ_B_loc``), the absolute position of C in the plane of the orbit (``xy_C``), the absolute positon of the center of mass of AB in the plane of the orbit (``xy_AB``), the position of A in the plane of the orbit, relative to the center of mass of AB (``xy_A_locs``), and the position of B in the plane of the orbit, relative to the center of mass of AB (``xy_B_locs``), for all dates provided. All positions are given in units of AU, and so must be converted to arcseconds after assuming a distance to the system.
 
         Args:
             dates (optional): if provided, calculate quantities at this new vector of dates, rather than the one provided when the object was initialized.
 
         Returns:
-            np.array: A ``(13, npoints)`` shape array of ``[vAs, vBs, vCs, XY_As, XY_Bs, XY_Cs, XY_ABs, XY_A_locs, XY_B_locs, xy_Cs, xy_ABs, xy_A_locs, xy_B_locs]``
+            dict: A dictionary with keys ``vAs``, ``vBs``, ``vCs``, ``XYZ_As``, ``XYZ_Bs``, ``XYZ_Cs``, ``XYZ_ABs``, ``XYZ_A_locs``, ``XYZ_B_locs``, ``xy_Cs``, ``xy_ABs``, ``xy_A_locs``, ``xy_B_locs``
         '''
 
         if dates is None and self.obs_dates is None:
@@ -649,7 +713,7 @@ class Triple:
             xy_A_locs[i] = np.array(xy_A_loc)
             xy_B_locs[i] = np.array(xy_B_loc)
 
-        return (vAs, vBs, vCs, XYZ_As, XYZ_Bs, XYZ_Cs, XYZ_ABs, XYZ_A_locs, XYZ_B_locs, xy_Cs, xy_ABs, xy_A_locs, xy_B_locs)
+        return {"vAs":vAs, "vBs":vBs, "vCs":vCs, "XYZ_As":XYZ_As, "XYZ_Bs":XYZ_Bs, "XYZ_Cs":XYZ_Cs, "XYZ_ABs":XYZ_ABs, "XYZ_A_locs":XYZ_A_locs, "XYZ_B_locs":XYZ_B_locs, "xy_Cs":xy_Cs, "xy_ABs":xy_ABs, "xy_A_locs":xy_A_locs, "xy_B_locs":xy_B_locs}
 
 
 models = {"Binary":Binary, "Triple":Triple}

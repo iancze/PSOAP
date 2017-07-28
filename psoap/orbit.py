@@ -1,3 +1,14 @@
+r'''
+Orbital conventions derived according to
+
+.. math::
+
+      v_{r,1} = K_1 (\cos (\omega_1 + f) + e \cos \omega_1) \\
+      v_{r,2} = K_2 (\cos (\omega_2 + f) + e \cos \omega_2)
+
+where a positive :math:`v_r` indicates a redshifted source and :math:`\omega_2 = \omega_1 + \pi`. In an RV-only paper, typically authors report :math:`\omega = \omega_1`.
+'''
+
 import numpy as np
 from scipy.optimize import fsolve
 from psoap import utils
@@ -9,7 +20,7 @@ class SB1:
     Args:
         K (float): velocity semi-amplitude
         e (float): eccentricity (must be between ``[0.0, 1.0)``)
-        omega (float): argument of periastron (degrees)
+        omega (float): argument of periastron for the primary star (degrees)
         P (float): period (days)
         T0 (float): epoch of periastron (JD)
         gamma (float): systemic velocity (km/s)
@@ -98,7 +109,7 @@ class SB2(SB1):
         q (float): mass ratio ``M_B / M_A``
         K (float): velocity semi-amplitude
         e (float): eccentricity (must be between ``[0.0, 1.0)``)
-        omega (float): argument of periastron (degrees)
+        omega (float): argument of periastron for primary star (degrees)
         P (float): period (days)
         T0 (float): epoch of periastron (JD)
         gamma (float): systemic velocity (km/s)
@@ -107,12 +118,13 @@ class SB2(SB1):
     def __init__(self, q, K, e, omega, P, T0, gamma, obs_dates=None, **kwargs):
         super().__init__(K, e, omega, P, T0, gamma, obs_dates=obs_dates, **kwargs)
         self.q = q
+        self.omega_2 = self.omega + 180 # calculate the argument of periastron for the secondary star
 
     def _v2_f(self, f):
         '''Calculate the component of B's velocity based on only the inner orbit.
         f is the true anomoly of this inner orbit.'''
 
-        return -self.K/self.q * (np.cos(self.omega * np.pi/180 + f) + self.e * np.cos(self.omega * np.pi/180))
+        return self.K/self.q * (np.cos(self.omega_2 * np.pi/180 + f) + self.e * np.cos(self.omega_2 * np.pi/180))
 
     def _vB_t(self, t):
         f = self._theta(t)
@@ -151,12 +163,12 @@ class ST1:
     Args:
         K_in (float): velocity semi-amplitude for inner orbit
         e_in (float): eccentricity for inner orbit (must be between ``[0.0, 1.0)``)
-        omega_in (float): argument of periastron for inner orbit (degrees)
+        omega_in (float): argument of periastron for inner orbit (primary star) (degrees)
         P_in (float): inner period (days)
         T0_in (float): epoch of periastron for inner orbit (JD)
         K_out (float): velocity semi-amplitude for outer orbit
         e_out (float): eccentricity for outer orbit (must be between ``[0.0, 1.0)``)
-        omega_out (float): argument of periastron for outer orbit (degrees)
+        omega_out (float): argument of periastron for outer orbit (primary stars) (degrees)
         P_out (float): outer period (days)
         T0_out (float): epoch of periastron for outer orbit (JD)
         gamma (float): systemic velocity (km/s)
@@ -291,12 +303,13 @@ class ST2(ST1):
         super().__init__(K_in, e_in, omega_in, P_in, T0_in, K_out, e_out, omega_out, P_out, T0_out, gamma, obs_dates=obs_dates, **kwargs)
 
         self.q_in = q_in # [M2/M1]
+        self.omega_in_2 = self.omega_in + 180
 
     def _v2_f(self, f):
         '''Calculate the component of B's velocity based on only the inner orbit.
         f is the true anomoly of this inner orbit.'''
 
-        return -self.K_in/self.q_in * (np.cos(self.omega_in * np.pi/180 + f) + self.e_in * np.cos(self.omega_in * np.pi/180))
+        return self.K_in/self.q_in * (np.cos(self.omega_in_2 * np.pi/180 + f) + self.e_in * np.cos(self.omega_in_2 * np.pi/180))
 
     def _vB_t(self, t):
 
@@ -359,12 +372,13 @@ class ST3(ST2):
         super().__init__(q_in, K_in, e_in, omega_in, P_in, T0_in, K_out, e_out, omega_out, P_out, T0_out, gamma, obs_dates=obs_dates, **kwargs)
 
         self.q_out = q_out # [M2/M1]
+        self.omega_out_2 = self.omega_out + 180
 
     def _v3_f_C(self, f):
         '''Calculate the velocity of C based only on the outer orbit.
         f is the true anomoly of the outer orbit
         '''
-        return -self.K_out / self.q_out * (np.cos(self.omega_out * np.pi/180 + f) + self.e_out * np.cos(self.omega_out * np.pi/180))
+        return self.K_out / self.q_out * (np.cos(self.omega_out_2 * np.pi/180 + f) + self.e_out * np.cos(self.omega_out_2 * np.pi/180))
 
 
     def _vC_t(self, t):

@@ -4,7 +4,7 @@ import numpy as np
 from psoap import orbit_astrometry
 from psoap import constants as C
 import matplotlib.pyplot as plt
-
+from astropy.time import Time
 import matplotlib
 
 
@@ -12,32 +12,33 @@ import matplotlib
 from astropy.io import ascii
 
 
-plot_dir = "plots/41Dra/"
+plot_dir = "plots/GJ3305AB/"
 
-# Load the Tokovinin data sets for radial velocity and astrometry
-rv_data = ascii.read(C.PSOAP_dir + "data/41Dra/rv.dat")
+# Load the Montet RV dataset
+data = ascii.read(C.PSOAP_dir + "data/GJ3305AB/rv.txt", format="csv")
 
-ind_A = (rv_data["comp"] == "a")
-ind_B = (rv_data["comp"] == "b")
+# convert UT date to JD
+rv_jds_A = Time(data["date"], format="decimalyear")
+rv_jds_A.format = 'jd'
+rv_jds_A = rv_jds_A.value
 
-rv_jds_A = rv_data["JD"][ind_A]
-vAs_data = rv_data["RV"][ind_A]
-vAs_err = rv_data["err"][ind_A]
+vAs_data = data["RV"]
+vAs_err = data["RV_err"]
 
-rv_jds_B = rv_data["JD"][ind_B]
-vBs_data = rv_data["RV"][ind_B]
-vBs_err = rv_data["err"][ind_B]
 
-# Sort to separate vA and vB from each other
-astro_data = ascii.read(C.PSOAP_dir + "data/41Dra/astro.dat")
+# Load the Montet astrometry dataset
+astro_data = ascii.read(C.PSOAP_dir + "data/GJ3305AB/astro.txt", format="csv")
 
 rho_data = astro_data["rho"]
-rho_err = 0.003
+rho_err = astro_data["rho_err"]
 
-theta_data = astro_data["theta"]
-theta_err = 0.1
+theta_data = astro_data["PA"]
+theta_err = astro_data["PA_err"]
 
-astro_jds = astro_data["JD"]
+
+astro_jds = Time(astro_data["date"], format="decimalyear")
+astro_jds.format = 'jd'
+astro_jds = astro_jds.value
 
 # Make a plot of the astrometric data on the sky
 fig, ax = plt.subplots(nrows=1)
@@ -51,23 +52,30 @@ ax.plot(0,0, "k*")
 ax.set_aspect("equal", "datalim")
 fig.savefig(plot_dir + "data_astro.png")
 
-dpc = 44.6 # pc
+dpc = 29.43 # pc
 
 # Orbital elements for 41 Dra
-a = 0.0706 * dpc # [AU]
-e = 0.9754
-i = 49.7 # [deg]
-omega = 127.31 # omega_1
-Omega = 1.9 + 180 # [deg]
-T0 = 2449571.037 # [Julian Date]
-M_2 = 1.20 # [M_sun]
-M_tot = 1.28 + M_2 # [M_sun]
-gamma = 5.76 # [km/s]
+a = 9.78 # [AU]
+e = 0.19
+# e = 0.3
+i = 92.1 # [deg]
+# omega = -69 # omega_1
+# omega = 0
+omega = -69
+# omega_2 = omega_2 + 180
+
+# omega_2 = omega + 180
+# omega = omega_2 - 180# [deg] # we actua
+Omega = 18.8 + 180 # [deg]
+# Omega = 20 # [deg]
+T0 = Time(2007.14, format="decimalyear")
+T0.format = "jd"
+T0 = T0.value # [Julian Date]
+M_2 = 0.44 # [M_sun]
+M_tot = 0.67 + M_2 # [M_sun]
+gamma = 20.76 # [km/s]
 
 P = np.sqrt(4 * np.pi**2 / (C.G * M_tot * C.M_sun) * (a * C.AU)**3) / (24 * 3600) # [day]
-
-# Pick a span of dates for the observations
-dates_obs = np.linspace(2446630, 2452010, num=300) # [day]
 
 # Pick a span of dates for one period
 dates = np.linspace(T0, T0 + P, num=600)
@@ -127,10 +135,9 @@ ax.plot(0,0, "*k", ms=2)
 ax.plot(peri_BA[0], peri_BA[1], "ko", ms=3)
 ax.plot(asc_BA[0], asc_BA[1], "o", color="C2", ms=3)
 ax.set_xlabel(r"$\Delta \delta$ mas")
-ax.set_ylabel(r"$\Delta \alpha \cos \delta $ mas")
+ax.set_ylabel(r"$\Delta \alpha \cos \delta$ mas")
 ax.set_aspect("equal", "datalim")
 fig.savefig(plot_dir + "orbit_B_rel_A.png")
-
 
 # Make a series of astrometric plots from different angles.
 
@@ -144,13 +151,10 @@ ax.plot(peri_B[0], peri_B[1], "ko", ms=3)
 ax.plot(asc_A[0], asc_A[1], "^", color="C0", ms=3)
 ax.plot(asc_B[0], asc_B[1], "^", color="C1", ms=3)
 ax.set_xlabel(r"$\Delta \delta$ mas")
-ax.set_ylabel(r"$\Delta \alpha \cos \delta$ mas")
+ax.set_ylabel(r"$\Delta \alpha$ mas")
 ax.set_aspect("equal", "datalim")
-
 fig.subplots_adjust(left=0.15, right=0.85, bottom=0.15, top=0.85)
-# Plot A and B together, viewed from the observer (along -Z axis).
 fig.savefig(plot_dir + "orbit_AB_Z.png")
-
 
 # Now plot A and B together, viewed from the X axis
 # This means Y will form the "X" axis, or North
@@ -163,7 +167,7 @@ ax.plot(peri_A[1], peri_A[2], "ko", ms=3)
 ax.plot(peri_B[1], peri_B[2], "ko", ms=3)
 ax.plot(asc_A[1], asc_A[2], "^", color="C0", ms=3)
 ax.plot(asc_B[1], asc_B[2], "^", color="C1", ms=3)
-ax.set_xlabel(r"$\Delta \alpha \cos \delta$ mas")
+ax.set_xlabel(r"$\Delta \alpha$ mas")
 ax.set_ylabel(r"$\Delta Z$ mas (towards observer)")
 ax.axhline(0, ls=":", color="k")
 ax.set_aspect("equal", "datalim")
@@ -239,11 +243,12 @@ fig.savefig(plot_dir + "orbit_AB_plane.png")
 # Redo this using a finer space series of dates spanning the full series of observations.
 
 # Pick a span of dates for the observations
-dates = np.linspace(2446630, 2452010, num=3000) # [day]
+dates = np.linspace(2452240, 2457265, num=3000) # [day]
 orb = orbit_astrometry.Binary(a, e, i, omega, Omega, T0, M_tot, M_2, gamma, obs_dates=dates)
 
 polar_dict = orb.get_orbit()
 vAs, vBs, rho_ABs, theta_ABs = [polar_dict[key] for key in ("vAs", "vBs", "rhos", "thetas")]
+
 # Convert to sky coordinates, using distance
 rho_ABs = rho_ABs/dpc # [arcsec]
 
@@ -256,14 +261,14 @@ ax[0].plot(rv_jds_A, vAs_data, "k.")
 ax[0].set_ylabel(r"$v_A$ km/s")
 
 ax[1].plot(dates, vBs)
-ax[1].errorbar(rv_jds_B, vBs_data, yerr=vBs_err, ls="")
-ax[1].plot(rv_jds_B, vBs_data, "k.")
+# ax[1].errorbar(rv_jds_B, vBs_data, yerr=vBs_err, ls="")
+# ax[1].plot(rv_jds_B, vBs_data, "k.")
 ax[1].set_ylabel(r"$v_B$ km/s")
 
 ax[2].plot(dates, rho_ABs)
-ax[2].errorbar(astro_jds, rho_data, yerr=rho_err, ls="")
-ax[2].plot(astro_jds, rho_data, "k.")
-ax[2].set_ylabel(r"$\rho_\mathrm{AB}$ [mas]")
+ax[2].errorbar(astro_jds, 1e-3*rho_data, yerr=1e-3*rho_err, ls="")
+ax[2].plot(astro_jds, 1e-3*rho_data, "k.")
+ax[2].set_ylabel(r"$\rho_\mathrm{AB}$ [arcsec]")
 
 ax[3].plot(dates, theta_ABs)
 ax[3].errorbar(astro_jds, theta_data, yerr=theta_err, ls="")
@@ -272,58 +277,3 @@ ax[3].set_ylabel(r"$\theta$ [deg]")
 
 ax[-1].set_xlabel("date")
 fig.savefig(plot_dir + "orbit_vel_rho_theta.png", dpi=400)
-
-# Plot the phase-folded RVs
-fig, ax = plt.subplots(nrows=1, figsize=(8,8))
-
-P = orb.P
-T0 = orb.T0
-
-print("P", P)
-print("K_A", orb.K)
-print("q", orb.q)
-
-
-phase = ((dates - T0) % (2*P)) / P
-
-rv_phase_A = ((rv_jds_A - T0) % P) / P
-rv_phase_B = ((rv_jds_B - T0) % P) / P
-
-# sort according to phase
-ind = np.argsort(phase)
-ax.plot(phase[ind], vAs[ind], color="k")
-ax.plot(phase[ind], vBs[ind], color="r", ls="--")
-
-ax.plot(rv_phase_A, vAs_data, "k.")
-
-ax.plot(rv_phase_B, vBs_data, "r.")
-
-ax.set_xlabel("phase")
-ax.set_ylabel(r"$v$ [km/s]")
-ax.set_xlim(-0.2, 1.2)
-fig.savefig(plot_dir + "orbit_rv_phase.png", dpi=300)
-
-
-# remake a zoomed version of this figure to compare to the plot in Tokovinin.
-
-fig, ax = plt.subplots(nrows=1, figsize=(8,8))
-
-ax.plot(phase[ind], vAs[ind], color="k")
-ax.plot(phase[ind], vBs[ind], color="r", ls="--")
-
-indA = rv_phase_A < 0.05
-indB = rv_phase_B < 0.05
-
-# Shift the points so they show up on our plot
-rv_phase_A[indA] = 1.0 + rv_phase_A[indA]
-rv_phase_B[indB] = 1.0 + rv_phase_B[indB]
-
-ax.plot(rv_phase_A, vAs_data, "k.")
-ax.plot(rv_phase_B, vBs_data, "r.")
-
-ax.set_xlabel("phase")
-ax.set_ylabel(r"$v$ [km/s]")
-
-ax.set_xlim(0.98, 1.03)
-
-fig.savefig(plot_dir + "orbit_rv_phase_zoom.png", dpi=300)

@@ -146,14 +146,16 @@ elif config["model"] == "SB2":
         vAs, vAs_fine, vBs, vBs_fine = get_orbit_SB2(p)
         ax.plot(dates_fine, vAs_fine, color="b", lw=0.5, alpha=0.3)
         ax.plot(dates_fine, vBs_fine, color="g", lw=0.5, alpha=0.3)
-        ax.plot(dates, vAs, ".", color="b")
-        ax.plot(dates, vBs, ".", color="g")
+
+    ax.plot(dates, vAs, ".", color="b")
+    ax.plot(dates, vBs, ".", color="g")
 
     # Save the velocities from a random draw.
     np.save("vA_model.npy", vAs)
     np.save("vB_model.npy", vBs)
 
     ax.set_xlabel("Julian Date")
+    ax.set_ylabel(r"$v\,$[km/s]")
 
     fig.savefig("orbits.png", dpi=300)
 
