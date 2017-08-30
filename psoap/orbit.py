@@ -7,6 +7,10 @@ Orbital conventions derived according to
       v_{r,2} = K_2 (\cos (\omega_2 + f) + e \cos \omega_2)
 
 where a positive :math:`v_r` indicates a redshifted source and :math:`\omega_2 = \omega_1 + \pi`. In an RV-only paper, typically authors report :math:`\omega = \omega_1`.
+
+In general, quantities like ``vA``, ``vB``, and ``vC`` refer to radial velocities relative to the heliocentric frame of the earth, i.e., quantities to directly compare to actual radial velocity measurements.
+
+(Private) quantities like ``v1``, ``v2``, ``v1_in``, and ``v1_out`` have more subtle meanings---these are generally partial velocities used in the process of constructing ``vA``, etc...
 '''
 
 import numpy as np
@@ -40,9 +44,15 @@ class SB1:
         self.obs_dates = obs_dates
 
 
-    def _theta(self, t):
-        '''Calculate the true anomoly for the A-B orbit.
-        Input is in days.'''
+    def _f(self, t):
+        '''Calculate the true anomoly :math:`f` for the A-B orbit.
+
+        Args:
+            t (float): time to evaluate true anomaly at [days].
+
+        Returns:
+            float: true anomaly
+            '''
 
         # t is input in seconds
 
@@ -63,7 +73,10 @@ class SB1:
 
     def _v1_f(self, f):
         '''Calculate the component of A's velocity based on only the inner orbit.
-        f is the true anomoly of this inner orbit.'''
+
+        Args: f (float): true anomaly of inner orbit.
+
+        Returns: velocity of A (no systemic velocity included).'''
 
         return self.K * (np.cos(self.omega * np.pi/180 + f) + self.e * np.cos(self.omega * np.pi/180))
 
@@ -72,7 +85,7 @@ class SB1:
 
         '''
         # Get the true anomoly "f" from time
-        f = self._theta(t)
+        f = self._f(t)
 
         # Feed this into the orbit equation and add the systemic velocity
         return self._v1_f(f) + self.gamma
@@ -127,7 +140,7 @@ class SB2(SB1):
         return self.K/self.q * (np.cos(self.omega_2 * np.pi/180 + f) + self.e * np.cos(self.omega_2 * np.pi/180))
 
     def _vB_t(self, t):
-        f = self._theta(t)
+        f = self._f(t)
 
         # Feed this into the orbit equation and add the systemic velocity
         return self._v2_f(f) + self.gamma
@@ -193,7 +206,7 @@ class ST1:
         # just store them to the object.
         self.obs_dates = obs_dates
 
-    def _theta_in(self, t):
+    def _f_in(self, t):
         '''Calculate the true anomoly for the A-B orbit.'''
 
         # t is input in seconds
@@ -213,7 +226,7 @@ class ST1:
         else:
             return th + 2 * np.pi
 
-    def _theta_out(self, t):
+    def _f_out(self, t):
         '''Calculate the true anomoly for the (A-B) - C orbit.'''
 
         # t is input in seconds
@@ -239,23 +252,49 @@ class ST1:
 
         return self.K_in * (np.cos(self.omega_in * np.pi/180 + f) + self.e_in * np.cos(self.omega_in * np.pi/180))
 
-
     def _v3_f(self, f):
         '''Calculate the velocity of (A-B) based only on the outer orbit.
         f is the true anomoly of the outer orbit'''
         return  self.K_out * (np.cos(self.omega_out * np.pi/180 + f) + self.e_out * np.cos(self.omega_out * np.pi/180))
 
-
     def _vA_t(self, t):
 
         # Get the true anomoly "f" from time
-        f_in = self._theta_in(t)
-        f_out = self._theta_out(t)
+        f_in = self._f_in(t)
+        f_out = self._f_out(t)
 
         v1 = self._v1_f(f_in)
         v3 = self._v3_f(f_out)
 
         return v1 + v3 + self.gamma
+
+    def get_component_velocities(self, dates=None):
+        '''
+        Routine to grab v1_inner and v1_outer.
+
+        Args:
+            dates (optional): if provided, calculate velocities at this new vector of dates, rather than the one provided when the object was initialized.
+
+        Returns:
+            np.array: A ``(1, nvels)`` shape array of the primary velocities for the outer motion
+        '''
+
+        if dates is None and self.obs_dates is None:
+            raise RuntimeError("Must provide input dates or specify observation dates upon creation of orbit object.")
+
+        if dates is None and self.obs_dates is not None:
+            dates = self.obs_dates
+
+        dates = np.atleast_1d(dates)
+
+        # calculate f_in and f_out for all dates
+        f_ins = np.array([self._f_in(date) for date in dates])
+        f_outs = np.array([self._f_out(date) for date in dates])
+
+        v1s = np.array([self._v1_f(f) for f in f_ins])
+        v3s = np.array([self._v3_f(f) for f in f_outs])
+
+        return np.vstack((v1s, v3s))
 
     def get_velocities(self, dates=None):
         '''
@@ -279,6 +318,7 @@ class ST1:
         vAs = np.array([self._vA_t(date) for date in dates])
 
         return np.atleast_2d(vAs)
+
 
 class ST2(ST1):
     '''
@@ -314,13 +354,42 @@ class ST2(ST1):
     def _vB_t(self, t):
 
         # Get the true anolomy "f" from time
-        f_in = self._theta_in(t)
-        f_out = self._theta_out(t)
+        f_in = self._f_in(t)
+        f_out = self._f_out(t)
 
         v2 = self._v2_f(f_in)
         v3 = self._v3_f(f_out)
 
         return v2 + v3 + self.gamma
+
+    def get_component_velocities(self, dates=None):
+        '''
+        Routine to grab v1_inner and v1_outer.
+
+        Args:
+            dates (optional): if provided, calculate velocities at this new vector of dates, rather than the one provided when the object was initialized.
+
+        Returns:
+            np.array: A ``(1, nvels)`` shape array of the primary velocities for the outer motion
+        '''
+
+        if dates is None and self.obs_dates is None:
+            raise RuntimeError("Must provide input dates or specify observation dates upon creation of orbit object.")
+
+        if dates is None and self.obs_dates is not None:
+            dates = self.obs_dates
+
+        dates = np.atleast_1d(dates)
+
+        # calculate f_in and f_out for all dates
+        f_ins = np.array([self._f_in(date) for date in dates])
+        f_outs = np.array([self._f_out(date) for date in dates])
+
+        v1s = np.array([self._v1_f(f) for f in f_ins])
+        v2s = np.array([self._v2_f(f) for f in f_ins])
+        v3s = np.array([self._v3_f(f) for f in f_outs])
+
+        return np.vstack((v1s, v2s, v3s))
 
     def get_velocities(self, dates=None):
         '''
@@ -384,7 +453,7 @@ class ST3(ST2):
     def _vC_t(self, t):
 
         # Get the true anolomy "f" from time
-        f_out = self._theta_out(t)
+        f_out = self._f_out(t)
 
         v3 = self._v3_f_C(f_out)
 

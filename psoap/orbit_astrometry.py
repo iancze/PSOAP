@@ -53,7 +53,7 @@ class Binary:
         omega (float): argument of periastron of the *primary*, i.e. :math:`\omega_1` [degrees]
         Omega (float): position angle of the ascending node (going into sky) [deg] east of north
         T0 (float): epoch of periastron passage [JD]
-        M_tot (float): sum of the masses [:math:`M_\odot`]
+        M_tot (float): sum of the masses :math:`M_\mathrm{A} + M_\mathrm{B}` [:math:`M_\odot`]
         M_2 (float): mass of B [:math:`M_\odot`]
         gamma (float): systemic velocity (km/s)
         obs_dates (1D np.array): dates of observation (JD)
@@ -61,6 +61,7 @@ class Binary:
 
     def __init__(self, a, e, i, omega, Omega, T0, M_tot, M_2, gamma, obs_dates=None, **kwargs):
         assert (e >= 0.0) and (e < 1.0), "Eccentricity must be between [0, 1)"
+        assert (i >= 0.0) and (i <= 180.), "Inclination must be between [0, 180]"
         self.a = a # [AU] semi-major axis
         self.e = e # eccentricity
         self.i = i # [deg] inclination
@@ -349,6 +350,8 @@ class Triple:
     def __init__(self, a_in, e_in, i_in, omega_in, Omega_in, T0_in, a_out, e_out, i_out, omega_out, Omega_out, T0_out, M_1, M_2, M_3, gamma, obs_dates=None, **kwargs):
         assert (e_in >= 0.0) and (e_in < 1.0), "Inner eccentricity must be between [0, 1)"
         assert (e_out >= 0.0) and (e_out < 1.0), "Outer eccentricity must be between [0, 1)"
+        assert (i_in >= 0.0) and (i_in <= 180.), "Inner inclination must be between [0, 180]"
+        assert (i_out >= 0.0) and (i_out <= 180.), "Outur inclination must be between [0, 180]"
         self.a_in = a_in # [AU]
         self.e_in = e_in #
         self.i_in = i_in # [deg]

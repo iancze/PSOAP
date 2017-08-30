@@ -11,28 +11,46 @@ import matplotlib
 plot_dir = "plots/triple/"
 
 
-dpc = 385 # pc
+dpc = 388 # pc
 
-# Orbital elements for 41 Dra
-a_in = 1.2 # [AU]
-e_in = 0.2
-i_in = 135.0 # [deg]
-omega_in = 45.0 # omega_1
-Omega_in = 30. # [deg]
-T0_in = 2450000.0 # [Julian Date]
+# Orbital elements for GW Ori
+# a_in = 1.2 # [AU]
+# e_in = 0.2
+# i_in = 135.0 # [deg]
+# omega_in = 45.0 # omega_1
+# Omega_in = 30. # [deg]
+# T0_in = 2450000.0 # [Julian Date]
+#
+# a_out = 8.0 # [AU]
+# e_out = 0.2
+# i_out = 135.0 # [deg]
+# omega_out = 45.0 # omega_1
+# Omega_out = 30. # [deg]
+# T0_out = 2450000.0 # [Julian Date]
+#
+# M_1 = 3.0
+# M_2 = 1.50 # [M_sun]
+# M_3 = 1.0 # M_sun
+#
+# gamma = 27.0 # [km/s]
 
-a_out = 8.0 # [AU]
-e_out = 0.2
-i_out = 135.0 # [deg]
-omega_out = 45.0 # omega_1
-Omega_out = 30. # [deg]
-T0_out = 2450000.0 # [Julian Date]
+a_in = 10**(0.127) # [AU]
+e_in = 0.074
+i_in = 152.35 # [deg]
+omega_in = 200.8 # [deg]
+Omega_in = 275.8 # [deg]
+T0_in = 2451853.6 # [Julian Date]
 
-M_1 = 3.0
-M_2 = 1.50 # [M_sun]
-M_3 = 1.0 # M_sun
-
-gamma = 27.0 # [km/s]
+a_out = 10**(0.974) # [AU]
+e_out = 0.19 #
+i_out = 149.0 # [deg]
+omega_out = 305.8 # [deg]
+Omega_out = 282.0 # [deg]
+T0_out = 2453855 # [Julian Date]
+M_1 = 3.65 # [M_sun]
+M_2 = 1.844 # [M_sun]
+M_3 = 0.84 # [M_sun]
+gamma = 26.29 # [km/s]
 
 P_in = np.sqrt(4 * np.pi**2 / (C.G * (M_1 + M_2) * C.M_sun) * (a_in * C.AU)**3) / (24 * 3600) # [day]
 P_out = np.sqrt(4 * np.pi**2 / (C.G * (M_1 + M_2 + M_3) * C.M_sun) * (a_out * C.AU)**3) / (24 * 3600) # [day]
