@@ -1,6 +1,6 @@
-"""A Data-driven Gaussian Process Spectra Package
+"""Disentangling Time-series Spectra with Gaussian Processes: Applications to Radial Velocity Analysis
 
-https://github.com/iancze/LkCa
+https://github.com/iancze/psoap
 """
 
 # Always prefer setuptools over distutils
