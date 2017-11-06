@@ -3,7 +3,6 @@
 Installation
 ============
 
-
 PSOAP requires a few standard packages. It is written for Python 3.3+. It is not tested on the Python 2.x series and I do not anticipate it to work on it either.
 
 * ``numpy``
