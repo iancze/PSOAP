@@ -122,12 +122,12 @@ class Chunk:
     Hold a chunk of data. Each chunk is shape (n_epochs, n_pix) and has components wl, fl, sigma, date, and mask (all the same length).
     '''
     def __init__(self, wl, fl, sigma, date, mask=None):
-        self.wl = wl
-        self.lwl = np.log(wl) # Natural log!
-        self.fl = fl
-        self.sigma = sigma
-        self.date = date
-        self.date1D = date[:,0]
+        self.wl = wl #: wavelength vector
+        self.lwl = np.log(wl) #: natural log of the wavelength vector
+        self.fl = fl #: flux vector
+        self.sigma = sigma #: measurement uncertainty vector
+        self.date = date #: date vector
+        self.date1D = date[:,0] #: data vector of length `n_epochs`
 
         if mask is None:
             self.mask = np.ones_like(self.wl, dtype="bool")

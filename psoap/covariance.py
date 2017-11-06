@@ -13,7 +13,13 @@ try:
     import celerite
     from celerite import terms
 except ImportError:
-    print("If you want to use the fast 1D (SB1 or ST1) models, please install celerite")
+    print("If you want to use the fast 1D (SB1 or ST1 models), please install celerite")
+
+try:
+    import george
+    from george import kernels
+except ImportError:
+    print("If you want to use the fast GP solver (SB2, ST2, or ST3 models) please install george")
 
 
 def predict_f(lwl_known, fl_known, sigma_known, lwl_predict, amp_f, l_f, mu_GP=1.0):
@@ -370,6 +376,33 @@ def lnlike_f_g_h(V11, wl_f, wl_g, wl_h, fl, sigma, amp_f, l_f, amp_g, l_g, amp_h
 
 # Assemble lnlikelihood functions for the different models
 lnlike = {"SB1": lnlike_f, "SB2": lnlike_f_g, "ST1": lnlike_f, "ST2": lnlike_f_g, "ST3": lnlike_f_g_h}
+
+# Alternatively, use george to do the likelihood calculations
+def lnlike_f_g_george(lwl_f, lwl_g, fl, sigma, amp_f, l_f, amp_g, l_g, mu_GP=1.):
+    '''
+    Evaluate the joint likelihood for *f* and *g* using George.
+    '''
+
+    # assumes that the log wavelengths, fluxes, and errors are already flattened
+    # lwl_f = chunk.lwl.flatten()
+    # lwl_g = chunk.lwl.flatten()
+
+    # does it help to sort?
+    # ind = np.argsort(lwl_f)
+
+    x = np.vstack((lwl_f, lwl_g)).T
+
+    # might also want to "block" the kernel to limit it to some velocity range
+    kernel = amp_f * kernels.ExpSquaredKernel(l_f, ndim=2, axes=0) # primary
+    kernel += amp_g * kernels.ExpSquaredKernel(l_g, ndim=2, axes=1) # secondary
+
+    # instantiate the GP and evaluate the kernel for the prior
+    gp = george.GP(kernel)
+    gp.compute(x, sigma)
+
+    # evaluate the likelihood for the data
+    return gp.log_likelihood(fl)
+
 
 def optimize_GP_f(wl_known, fl_known, sigma_known, amp_f, l_f, mu_GP=1.0):
     '''

@@ -19,7 +19,6 @@ Data module
 .. automodule:: psoap.data
     :members:
 
-
 Utils module
 ------------
 

@@ -10,16 +10,21 @@ Tutorial
 ========
 
 This tutorial works through the example of fitting the LP661-13 dataset
-which appeared in Czekala et al. 2017. The spectra were originally
-acquired by Dittmann et al. 2017, and can be downloaded already in HDF5
-format HERE.
+which appeared in `Czekala et al.
+2017 <http://adsabs.harvard.edu/abs/2017ApJ...840...49C>`__. The spectra
+were originally acquired by `Dittmann et al.
+2017 <http://adsabs.harvard.edu/abs/2017ApJ...836..124D>`__, and can be
+downloaded in HDF5 format
+`**here** <https://figshare.com/articles/LP661-13_TRES_Spectra/5572714>`__.
 
 If you are looking to use data from a different telescope, you will need
 to process these spectra into a format like this HDF5 file. Some
-additional notes on how to do this are HERE.
+additional notes on how to do this are in `processing your spectra to an
+HDF5
+file <http://psoap.readthedocs.io/en/latest/configuration.html#processing-your-spectra-to-an-hdf5-file>`__.
 
-This tutorial assumes that you have already followed the installation
-instructions, HERE.
+This tutorial assumes that you have already followed the `installation
+instructions <http://psoap.readthedocs.io/en/latest/installation.html>`__.
 
 Visualizing the dataset
 =======================

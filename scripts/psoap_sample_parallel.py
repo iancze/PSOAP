@@ -193,6 +193,7 @@ class Worker:
 
         # Feed velocities and GP parameters to fill out covariance matrix appropriate for this model
         lnp = covariance.lnlike[model](self.V11, *lwls, self.fl, self.sigma, *p_GP)
+        # lnp = covariance.lnlike_f_g_george(*lwls, self.fl, self.sigma, *p_GP)
 
         gc.collect()
 
