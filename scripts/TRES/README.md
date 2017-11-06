@@ -2,7 +2,7 @@
 
 To use these scripts, you'll want to download two versions of your spectra from the TRES archive, the 'raw' spectra, and those that have been corrected for the blaze function (those in the `b/` directory). We'll use both of these together to get an estimate of the noise in each pixel.
 
-You'll also need to install the EchelleJSON package from here: https://github.com/iancze/EchelleJSON (I know, yet another format...)
+You'll also need to install the astropy/specutils package from here: https://github.com/astropy/specutils, and the EchelleJSON package from here: https://github.com/iancze/EchelleJSON (I know, yet another format...)
 
 Download the raw spectra into a sub-directory called `spectra_raw/`, and the blaze-corrected spectra into a directory called `spectra/`.
 
