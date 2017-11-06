@@ -11,6 +11,12 @@ from os import path
 
 import numpy as np
 
+# set the command line scripts
+entry_points = {'console_scripts': [
+    'psoap-initialize = psoap.initialize:main'
+]}
+
+
 # Required for cython
 from setuptools.extension import Extension
 from Cython.Build import cythonize
@@ -84,6 +90,7 @@ setup(
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=['numpy', 'scipy', 'cython', 'h5py', 'emcee', 'astropy'],
 
+    entry_points=entry_points,
     # List additional groups of dependencies here (e.g. development
     # dependencies). You can install these using the following syntax,
     # for example:
