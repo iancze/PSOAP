@@ -9,8 +9,7 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
-    "sphinx.ext.napoleon",
-    "sphinxarg.ext"
+    "sphinx.ext.napoleon"
 ]
 
 templates_path = ['.templates']

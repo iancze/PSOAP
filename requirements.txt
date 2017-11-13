@@ -4,3 +4,4 @@ cython
 h5py
 astropy
 emcee
+matplotlib
