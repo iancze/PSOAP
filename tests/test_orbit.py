@@ -1,11 +1,16 @@
 import pytest
 
+import os
 import numpy as np
 from psoap import orbit
 import matplotlib.pyplot as plt
 
-
 # Create plots of all of the orbits
+# If it doesn't already exist, create a "plots/basic/" directory
+outdir = "tests/plots/basic/"
+if not os.path.exists(outdir):
+    print("Creating ", outdir)
+    os.makedirs(outdir)
 
 # Binary orbit parameters
 dates = np.linspace(0, 20, num=200)
@@ -42,7 +47,7 @@ def test_SB1():
     ax.plot(dates, vels[0])
     ax.set_xlabel("JD")
     ax.set_ylabel(r"$v_A\,\mathrm{km/s}$")
-    fig.savefig("plots/SB1.png", dpi=300)
+    fig.savefig(outdir + "SB1.png", dpi=300)
 
 def test_SB2():
     orb = orbit.SB2(q, K, e, omega, P, T0, gamma, dates)
@@ -55,7 +60,7 @@ def test_SB2():
     ax.plot(dates, vels[1])
     ax.set_xlabel("JD")
     ax.set_ylabel(r"$v\,\mathrm{km/s}$")
-    fig.savefig("plots/SB2.png", dpi=300)
+    fig.savefig(outdir + "SB2.png", dpi=300)
 
 def test_ST1():
     orb = orbit.ST1(K_in, e_in, omega_in, P_in, T0_in, K_out, e_out, omega_out, P_out, T0_out, gamma, dates)
@@ -67,7 +72,7 @@ def test_ST1():
     ax.plot(dates, vels[0])
     ax.set_xlabel("JD")
     ax.set_ylabel(r"$v\,\mathrm{km/s}$")
-    fig.savefig("plots/ST1.png", dpi=300)
+    fig.savefig(outdir + "ST1.png", dpi=300)
 
 def test_ST2():
     orb = orbit.ST2(q_in, K_in, e_in, omega_in, P_in, T0_in, K_out, e_out, omega_out, P_out, T0_out, gamma, dates)
@@ -80,7 +85,7 @@ def test_ST2():
     ax.plot(dates, vels[1])
     ax.set_xlabel("JD")
     ax.set_ylabel(r"$v\,\mathrm{km/s}$")
-    fig.savefig("plots/ST2.png", dpi=300)
+    fig.savefig(outdir + "ST2.png", dpi=300)
 
 
 def test_ST3():
@@ -95,4 +100,6 @@ def test_ST3():
     ax.plot(dates, vels[2])
     ax.set_xlabel("JD")
     ax.set_ylabel(r"$v\,\mathrm{km/s}$")
-    fig.savefig("plots/ST3.png", dpi=300)
+    fig.savefig(outdir + "ST3.png", dpi=300)
+
+plt.close('all')
