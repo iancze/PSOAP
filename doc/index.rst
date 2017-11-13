@@ -10,14 +10,17 @@ Precision Spectroscopic Orbits A-Parametrically (pronounced 'soap')
 
 `PSOAP` is a package to model astronomical spectra nonparametrically, for the purposes of disentangling spectra (as in double-lined spectroscopic binaries) or simply determining orbits (in the case of (single-lined spectroscopic binaries or exoplanet hosts). For more information about the mathematical framework underlying `PSOAP`, please see our paper
 
-*Disentangling Time Series Spectra with Gaussian Processes: Applications to Radial Velocity Analysis*, Czekala et al., ApJ, https://arxiv.org/abs/1702.05652
+*Disentangling Time Series Spectra with Gaussian Processes: Applications to Radial Velocity Analysis*, `Czekala et al., 2017ApJ...840...49C <http://adsabs.harvard.edu/abs/2017ApJ...840...49C>`_
+
+`PSOAP` is actively developed on github `here <https://github.com/iancze/PSOAP/>`_
 
 Contents:
 
 .. toctree::
    :maxdepth: 2
 
-   installation
+   getting-started
+   scripts
    configuration
    models
    tutorial

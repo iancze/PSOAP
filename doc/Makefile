@@ -51,10 +51,13 @@ help:
 	@echo "  coverage   to run coverage check of the documentation (if enabled)"
 
 default: dirhtml
-TUTORIALS = tutorial.rst
+TUTORIALS = tutorial.rst scripts.rst
 
 tutorial.rst: .static/notebooks/tutorial.ipynb
 	jupyter nbconvert --template .templates/tutorial_rst --to rst $< --output-dir .
+
+scripts.rst: .static/notebooks/scripts.ipynb
+	jupyter nbconvert --execute --template .templates/scripts_rst --to rst $< --output-dir .
 
 .PHONY: clean
 clean:

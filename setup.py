@@ -13,7 +13,11 @@ import numpy as np
 
 # set the command line scripts
 entry_points = {'console_scripts': [
-    'psoap-initialize = psoap.initialize:main'
+    'psoap-initialize = psoap.initialize:main',
+    'psoap-sample = psoap.sample:main',
+    'psoap-sample-george = psoap.sample_george:main',
+    'psoap-sample-parallel = psoap.sample_parallel:main',
+    'psoap-plot-samples = psoap.plot_samples:main'
 ]}
 
 
@@ -103,9 +107,9 @@ setup(
     # If there are data files included in your packages that need to be
     # installed, specify them here.  If using Python 2.6 or less, then these
     # have to be included in MANIFEST.in as well.
-    # package_data={
-    #     'sample': ['package_data.dat'],
-    # },
+    package_data={
+        'psoap': ['data/*.yaml', 'data/*.dat'],
+    },
 
     # Although 'package_data' is the preferred approach, in some case you may
     # need to place data files outside of your packages. See:

@@ -344,7 +344,8 @@ def lnlike_f_g(V11, wl_f, wl_g, fl, sigma, amp_f, l_f, amp_g, l_g, mu_GP=1.):
     V11[np.diag_indices_from(V11)] += sigma**2
 
     try:
-        factor, flag = cho_factor(V11)
+        # factor, flag = cho_factor(V11)
+        factor, flag = cho_factor(V11, overwrite_a=True, lower=False, check_finite=False)
     except np.linalg.linalg.LinAlgError:
         return -np.inf
 

@@ -198,4 +198,3 @@ class Chunk:
 
 # Load the HDF5 files into global scope
 basedir = os.path.dirname(inspect.getfile(psoap))
-lkca14 = Spectrum(basedir + "/../data/LkCa14.hdf5")

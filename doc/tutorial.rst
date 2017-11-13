@@ -27,7 +27,7 @@ This tutorial assumes that you have already followed the `installation
 instructions <http://psoap.readthedocs.io/en/latest/installation.html>`__.
 
 Visualizing the dataset
-=======================
+-----------------------
 
 Before we do any analysis with PSOAP, it's a good idea to plot up all of
 your data. That way, we can see if there are any regions of the spectrum
@@ -61,7 +61,7 @@ This will produce a bunch of plots in a newly-created ``plots``
 directory.
 
 Creating a configuration file
-=============================
+-----------------------------
 
 PSOAP generally relies upon a configuration text file for many of the
 project-specific settings. To create one from scratch, use the
@@ -99,7 +99,7 @@ favorite text editor, and familiarize yourself with the settings. For
 more information, check out :ref:``configuration``.
 
 Setting up the chunks file
-==========================
+--------------------------
 
 Because Gaussian processes are generally very computationally intensive,
 we'll need to split the spectrum up into chunks so that it can be
@@ -139,4 +139,3 @@ for real, you could choose your chunks more wisely. The inference
 procedure is set up so that it's one chunk per CPU core, so generally
 feel free to use as many chunks as you have CPU cores, since there is no
 additional time penalty.
-
