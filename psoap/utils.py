@@ -1,3 +1,7 @@
+r'''
+The ``utils`` module contains values and functions for interacting with the registered spectroscopic orbits (:ref:`models`), converting these values from dictionaries to numpy vectors, filling frozen parameters, and assessing MCMC convergence through the Gelman-Rubin statistic.
+'''
+
 import numpy as np
 
 # A dictionary of parameter lists for conversion.
@@ -29,7 +33,7 @@ def convert_vector(p, model, fix_params, **kwargs):
 
     Args:
         p (np.float) : 1D input array of only a subset of parameter values.
-        model (str): "SB1", "SB2", etc..
+        model (str): ``"SB1"``, ``"SB2"``, etc..
         fix_params (list of str): names of parameters that will be fixed
         **kwargs: input for ``{param_name: default_value}`` pairs
 
@@ -70,7 +74,16 @@ def convert_vector(p, model, fix_params, **kwargs):
 
 # function convert_dict(p::Dict, model::AbstractString)
 def convert_dict(model, fix_params, **kwargs):
-    '''Used to turn a dictionary of parameter values (from config.yaml) directly into a parameter type. Generally used for synthesis and plotting command line scripts.'''
+    r'''Used to turn a dictionary of parameter values directly into a numpy array. Generally used for initializing starting position for MCMC routines from ``config.yaml``.
+
+    Args:
+        model (str): ``"SB1"``, ``"SB2"``, etc..
+        fix_params (list): list of parameters that are kept fixed, whose values are to be read from ``kwargs``.
+        kwargs (dict): dictionary of parameters with default values.
+
+    Returns:
+        np.array : length ``nparam`` vector constructed from ``kwargs`` values, excluding the fixed parameters.
+    '''
 
     # Select the registered parameters corresponding to this model
     reg_params = registered_params[model]
@@ -86,7 +99,14 @@ def convert_dict(model, fix_params, **kwargs):
 
 def get_labels(model, fix_params):
     '''
-    Collect the labels for each model, so that we can plot.
+    Collect the labels for each model to be used in plotting MCMC samples.
+
+    Args:
+        model (str):  ``"SB1"``, ``"SB2"``, etc..
+        fix_params (list): list of parameters that are kept fixed, whose values are to be read from ``kwargs``.
+
+    Returns:
+        list : a list of strings corresponding to the name of each parameter that was fit for.
     '''
     reg_params = registered_params[model]
     reg_labels = registered_labels[model]
@@ -97,11 +117,17 @@ def get_labels(model, fix_params):
     return labels
 
 def gelman_rubin(samplelist):
-    '''
+    r'''
     Given a list of flatchains from separate runs (that already have burn in cut
-    and have been trimmed, if desired), compute the Gelman-Rubin statistics in
-    Bayesian Data Analysis 3, pg 284. If you want to compute this for fewer
+    and have been trimmed, if desired), compute the Gelman-Rubin statistic for each parameter (more information in
+    Bayesian Data Analysis 3, pg 284 Gelman et al.). If you want to compute this for fewer
     parameters, then slice the list before feeding it in.
+
+    Args:
+        samplelist (list): list of flatchains
+
+    Returns:
+        float: the Gelman-Rubin statistic :math:`\hat{R}`
     '''
 
     full_iterations = len(samplelist[0])
@@ -166,6 +192,16 @@ def gelman_rubin(samplelist):
 
 
 def estimate_covariance(flatchain, ndim=0):
+    '''
+    Estimate the optimal Metropolis-Hastings jumps using the advice in Bayesian Data Analysis.
+
+    Args:
+        flatchain (np.array): array of samples
+        d (float): estimate the covariance using a restricted number of dimensions.
+
+    Returns:
+        np.array: 2D covariance matrix for "optimal" M-H jumps.
+    '''
 
     if ndim == 0:
         d = flatchain.shape[1]

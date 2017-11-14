@@ -13,11 +13,14 @@ import numpy as np
 
 # set the command line scripts
 entry_points = {'console_scripts': [
-    'psoap-initialize = psoap.initialize:main',
-    'psoap-sample = psoap.sample:main',
-    'psoap-sample-george = psoap.sample_george:main',
-    'psoap-sample-parallel = psoap.sample_parallel:main',
-    'psoap-plot-samples = psoap.plot_samples:main'
+    'psoap-initialize = psoap.scripts.initialize:main',
+    'psoap-generate-chunks = psoap.scripts.chunks:generate_main',
+    'psoap-process-chunks = psoap.scripts.chunks:process_main',
+    'psoap-generate-masks = psoap.scripts.masks:generate_main',
+    'psoap-process-masks = psoap.scripts.masks:process_main',
+    'psoap-sample = psoap.scripts.sample:main',
+    'psoap-sample-parallel = psoap.scripts.sample_parallel:main',
+    'psoap-plot-samples = psoap.scripts.plot_samples:main'
 ]}
 
 

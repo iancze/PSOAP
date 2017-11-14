@@ -1,5 +1,5 @@
 r'''
-Orbital conventions derived according to
+Orbital conventions are derived according to
 
 .. math::
 
@@ -8,14 +8,14 @@ Orbital conventions derived according to
 
 where a positive :math:`v_r` indicates a redshifted source and :math:`\omega_2 = \omega_1 + \pi`. In an RV-only paper, typically authors report :math:`\omega = \omega_1`.
 
-In general, quantities like ``vA``, ``vB``, and ``vC`` refer to radial velocities relative to the heliocentric frame of the earth, i.e., quantities to directly compare to actual radial velocity measurements.
+In general, quantities like ``vA``, ``vB``, and ``vC`` are the radial velocities relative to the heliocentric frame of the earth.
 
-(Private) quantities like ``v1``, ``v2``, ``v1_in``, and ``v1_out`` have more subtle meanings---these are generally partial velocities used in the process of constructing ``vA``, etc...
+(Private) quantities like ``v1``, ``v2``, ``v1_in``, and ``v1_out`` have more subtle meanings---these are generally partial velocities used in the process of constructing ``vA``, etc... and should only be accessed if you need to use them for a specific purpose. See the source code for more details.
 '''
 
 import numpy as np
 from scipy.optimize import fsolve
-from psoap import utils
+from . import utils
 
 class SB1:
     '''

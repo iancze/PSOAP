@@ -25,13 +25,13 @@ and change to the top level ``PSOAP`` directory. Build the package via ::
 
     $ python setup.py install
 
-Which should build the cython extensions (used for faster matrix evaluations) and install the system scripts to your shell ``PATH``. To check that you've got everything installed properly, try running from your shell ::
+Which should build the cython extensions (used for faster matrix evaluations) and install the system scripts to your shell ``PATH``. To check that you've got everything installed properly, open up a new shell window and try running ::
 
     $ psoap-initialize --check
     PSOAP successfully installed and linked.
     Using Python Version 3.6.3 |Anaconda custom (64-bit)| (default, Nov  3 2017, 19:19:16)
 
-If this doesn't work, try double-checking the output from your install process to see if any errors popped up. If you are unable to fix these issues via the normal means of debugging python installs, please `raise an issue <https://github.com/iancze/PSOAP/issues>`_ with specifics about your system.
+If this doesn't work, try double-checking the output from your install process to see if any errors popped up. If you are unable to fix these issues via the normal means of debugging Python installs, please `raise an issue <https://github.com/iancze/PSOAP/issues>`_ with specifics about your system.
 
 `PSOAP` has preliminary support for using the `celerite package <http://celerite.readthedocs.io/>`_, which implements fast, one dimensional Gaussian processes which are used when fitting a single stationary star, or a single-lined spectroscopic binary or triple. You can optionally install this package following the link above. Unfortunately, this speedup is not available when fitting double or triple-lined spectroscopic binaries, though there may exist approximations which make this possible in the future.
 
@@ -69,15 +69,3 @@ If you use our paper, code, or a derivative of it in your research, we would rea
     }
 
 Copyright Ian Czekala and collaborators 2016-17.
-
-
-Because the ``PSOAP`` package is still under occasional development, it may be wise to install the package in 'development mode' via the following commands::
-
-    $ pip install -e .
-    $ python setup.py build_ext --inplace
-
-
-If you installed the package via development mode, then it in the case that the package is upgraded, it is easy to upgrade your local copy by simply pulling down the latest changes and rerunning the build script::
-
-    $ git pull
-    $ python setup.py build_ext --inplace

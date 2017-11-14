@@ -1,18 +1,12 @@
 import sys
 import pkg_resources
-import psoap
-
 
 def main():
-    """
-    Available from command line as ``psoap-initialize``
-
-    """
 
     import argparse
 
-    parser = argparse.ArgumentParser(description="Initialize a new directory to do inference.")
-    parser.add_argument("--check", action="store_true", help="To help folks check whether the package was installed properly.")
+    parser = argparse.ArgumentParser(description="Initialize a new directory with the necessary configuration scripts to run PSOAP.")
+    parser.add_argument("--check", action="store_true", help="Check whether the package was installed and the scripts were linked properly.")
     parser.add_argument("--model", choices=["SB1", "SB2", "ST3"], help="Which type of model to use, SB1, SB2, ST1, or SB3.")
 
     args = parser.parse_args()
@@ -26,7 +20,6 @@ def main():
     else:
         # Initialize the directory based upon the chosen model
         import shutil
-        import psoap
 
         # Copy over the appropriate config.yaml file to current working directory
         masks = pkg_resources.resource_filename("psoap", "data/masks.dat")

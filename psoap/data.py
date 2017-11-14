@@ -1,11 +1,13 @@
+r'''
+The data module contains the routines responsible for manipulating the spectrum data, including a class for reading the dataset (``Spectrum``) and a class for reading the chunked spectrum (``Chunk``). It also contains routines for Doppler-shifting the spectra.
+'''
+
 import inspect
 import os
 import numpy as np
 import h5py
 
-import psoap
-from psoap import constants as C
-
+from . import constants as C
 
 def redshift(wl, v):
     '''
@@ -24,10 +26,10 @@ def redshift(wl, v):
 
 def lredshift(lwl, v):
     '''
-    Redshift a vector of wavelengths that are already in log-lamba (natural log). A positive velocity corresponds to a lengthening (increase) of the wavelengths in the array.
+    Redshift a vector of wavelengths that are already in ln(wavelengths) (natural log). A positive velocity corresponds to a lengthening (increase) of the wavelengths in the array.
 
     Args:
-        wl (np.array, arbitrary shape): the input ln(wavelengths).
+        lwl (np.array, arbitrary shape): the input ln(wavelengths).
         velocity (float): the velocity by which to redshift the wavelengths
 
     Returns:
@@ -37,7 +39,7 @@ def lredshift(lwl, v):
     lwl_red = lwl + v/C.c_kms
     return lwl_red
 
-def replicate_wls(lwls, velocities, mask):
+def replicate_lwls(lwls, velocities, mask):
     '''
     Using the set of velocities calculated from an orbit, copy and *blue*-shift the input ln(wavelengths), so that they correspond to the rest-frame wavelengths of the individual components. This routine is primarily for producing  replicated ln-wavelength vectors ready to feed to the GP routines.
 
@@ -119,7 +121,7 @@ class Spectrum:
 
 class Chunk:
     '''
-    Hold a chunk of data. Each chunk is shape (n_epochs, n_pix) and has components wl, fl, sigma, date, and mask (all the same length).
+    A class to interface with a chunk of data. Each chunk is shape ``(n_epochs, n_pix)`` and has components ``wl``, ``lwl``, ``fl``, ``sigma``, ``date``, and ``mask`` (all the same size). ``lwl`` is the **natural log** of the wavelengths.
     '''
     def __init__(self, wl, fl, sigma, date, mask=None):
         self.wl = wl #: wavelength vector
@@ -127,7 +129,7 @@ class Chunk:
         self.fl = fl #: flux vector
         self.sigma = sigma #: measurement uncertainty vector
         self.date = date #: date vector
-        self.date1D = date[:,0] #: data vector of length `n_epochs`
+        self.date1D = date[:,0] #: data vector of length ``n_epochs``
 
         if mask is None:
             self.mask = np.ones_like(self.wl, dtype="bool")
@@ -137,7 +139,7 @@ class Chunk:
 
     def apply_mask(self):
         '''
-        Apply the mask to all of the attributes, so now we return 1D arrays.
+        Apply the mask to all of the attributes, after which all of these attributes become 1D arrays.
         '''
         self.wl = self.wl[self.mask]
         self.lwl = self.lwl[self.mask]
@@ -150,7 +152,13 @@ class Chunk:
     def open(cls, order, wl0, wl1, limit=100, prefix=""):
         '''
         Load a spectrum from a directory link pointing to HDF5 output.
-        :param fname: HDF5 file containing files on disk.
+
+        Args:
+            order (int): the echelle order
+            wl0 (float): the starting wavelength of the chunk (AA)
+            wl1 (float): the ending wavelength of the chunk (AA)
+            limit (int): only load the first ``N`` epochs of spectra. If the chunk has been sorted by SNR, this corresponds to the ``N`` highest SNR epochs.
+            prefix (str; optional): prepend this prefix to the filename
         '''
 
         #Open the HDF5 file, try to load each of these values.
@@ -168,12 +176,22 @@ class Chunk:
             mask = np.array(hdf5["mask"][:limit], dtype="bool") # Make sure it is explicitly boolean mask
 
             print("Limiting to {} epochs".format(len(wl)))
+
         #Although the actual fluxes and errors may be reasonably stored as float32, we need to do
         # all of the calculations in float64, and so we convert here.
         #The wl must be stored as float64, because of precise velocity issues.
         return cls(wl.astype(np.float64), fl.astype(np.float64), sigma.astype(np.float64), date.astype(np.float64), mask)
 
     def save(self, order, wl0, wl1, prefix=""):
+        '''
+        Save a chunk object to disk as an HDF5 file.
+
+        Args:
+            order (int): the echelle order
+            wl0 (float): the starting wavelength of the chunk (AA)
+            wl1 (float): the ending wavelength of the chunk (AA)
+            prefix (str; optional): prepend this prefix to the filename
+        '''
         fname = prefix + C.chunk_fmt.format(order, wl0, wl1) + ".hdf5"
         shape = self.wl.shape
         import h5py
@@ -195,6 +213,3 @@ class Chunk:
             mask[:] = self.mask
 
             hdf5.close()
-
-# Load the HDF5 files into global scope
-basedir = os.path.dirname(inspect.getfile(psoap))

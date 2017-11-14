@@ -12,7 +12,7 @@ Precision Spectroscopic Orbits A-Parametrically (pronounced 'soap')
 
 *Disentangling Time Series Spectra with Gaussian Processes: Applications to Radial Velocity Analysis*, `Czekala et al., 2017ApJ...840...49C <http://adsabs.harvard.edu/abs/2017ApJ...840...49C>`_
 
-`PSOAP` is actively developed on github `here <https://github.com/iancze/PSOAP/>`_
+`PSOAP` is actively developed on github `here <https://github.com/iancze/PSOAP/>`_.
 
 Contents:
 
@@ -20,15 +20,15 @@ Contents:
    :maxdepth: 2
 
    getting-started
-   scripts
    configuration
    models
-   tutorial
    orbit
    data
    covariance
    sampling
    reconstruction
+   scripts
+   tutorial
    changelog
 
 
