@@ -91,12 +91,12 @@ Initialization
 
     usage: psoap-generate-masks [-h] [--sigma SIGMA]
     
-    Auto-generate a comprehensive masks.dat file, which can be later edited by
-    hand.
+    Auto-generate a comprehensive masks.dat file, which can later be edited by
+    hand if necessary.
     
     optional arguments:
       -h, --help     show this help message and exit
-      --sigma SIGMA  Flag a single epoch of a chunk if it contains a deviant of
+      --sigma SIGMA  Flag a single epoch of a chunk if it contains a deviant above
                      this level.
 
 
@@ -109,7 +109,8 @@ Initialization
 
     usage: psoap-process-masks [-h] [--plot]
     
-    Apply the masks contained in the masks.dat file.
+    Apply the masks contained in the masks.dat file to the list of chunks
+    contained in chunks.dat
     
     optional arguments:
       -h, --help  show this help message and exit
@@ -128,7 +129,6 @@ The following scripts are used in sampling the posterior distribution.
 
 .. parsed-literal::
 
-    You need to copy a config.yaml file to this directory, and then edit the values to your particular case.
     Traceback (most recent call last):
       File "/home/ian/.build/anaconda/bin/psoap-sample", line 11, in <module>
         load_entry_point('psoap==0.0.1', 'console_scripts', 'psoap-sample')()
@@ -140,9 +140,9 @@ The following scripts are used in sampling the posterior distribution.
         return self.resolve()
       File "/home/ian/.build/anaconda/lib/python3.6/site-packages/pkg_resources/__init__.py", line 2411, in resolve
         module = __import__(self.module_name, fromlist=['__name__'], level=0)
-      File "/home/ian/.build/anaconda/lib/python3.6/site-packages/psoap-0.0.1-py3.6-linux-x86_64.egg/psoap/scripts/sample.py", line 33, in <module>
-        f = open("config.yaml")
-    FileNotFoundError: [Errno 2] No such file or directory: 'config.yaml'
+      File "/home/ian/.build/anaconda/lib/python3.6/site-packages/psoap-0.0.1-py3.6-linux-x86_64.egg/psoap/scripts/sample.py", line 5, in <module>
+        from psoap.data import Chunk, lredshift, replicate_wls
+    ImportError: cannot import name 'replicate_wls'
 
 
 .. code:: python

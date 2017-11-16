@@ -14,6 +14,8 @@ Precision Spectroscopic Orbits A-Parametrically (pronounced 'soap')
 
 `PSOAP` is actively developed on github `here <https://github.com/iancze/PSOAP/>`_.
 
+.. image:: ../output.gif
+
 Contents:
 
 .. toctree::

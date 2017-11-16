@@ -4,10 +4,9 @@ from numpy.polynomial import Chebyshev as Ch
 from scipy.linalg import cho_factor, cho_solve
 from scipy.optimize import minimize
 
-import psoap
-from psoap import constants as C
-from psoap import matrix_functions
-from psoap.data import lredshift
+from . import constants as C
+from . import matrix_functions
+from .data import lredshift
 
 try:
     import celerite
@@ -15,29 +14,32 @@ try:
 except ImportError:
     print("If you want to use the fast 1D (SB1 or ST1 models), please install celerite")
 
-try:
-    import george
-    from george import kernels
-except ImportError:
-    print("If you want to use the fast GP solver (SB2, ST2, or ST3 models) please install george")
 
+def predict_f(lwl_f, fl_f, sigma_f, lwl_predict, amp_f, l_f, mu_f=1.0):
+    '''Return the posterior predictive GP mean and covariance.
 
-def predict_f(lwl_known, fl_known, sigma_known, lwl_predict, amp_f, l_f, mu_GP=1.0):
+    Args:
+        lwl_f (1D np.array): log(wavelength) vector for dataset
+        fl_f (1D np.array): flux vector for dataset
+        sigma_f (1D np.array): sigma vector for dataset
+        lwl_predict (1D np.array): log(wavelength) vector to use GP to predict at. Does not need to be the same length as lwl_f.
+        amp_f (float): amplitude of GP
+        l_f (float): length scale of GP
+        mu_f (float): mean of GP
 
-    '''wl_known are known wavelengths.
-    wl_predict are the prediction wavelengths.
-    Assumes all inputs are 1D arrays.'''
+    Returns:
+        tuple: (mu, Sigma) tuple of mean vector and covariance matrix.'''
 
     # determine V11, V12, V21, and V22
     M = len(lwl_known)
     V11 = np.empty((M, M), dtype=np.float64)
-    matrix_functions.fill_V11_f(V11, lwl_known, amp_f, l_f)
+    matrix_functions.fill_V11_f(V11, lwl_f, amp_f, l_f)
     # V11[np.diag_indices_from(V11)] += sigma_known**2
-    V11 = V11 + sigma_known**2 * np.eye(M)
+    V11 = V11 + sigma_f**2 * np.eye(M)
 
-    N = len(wl_predict)
+    N = len(lwl_predict)
     V12 = np.empty((M, N), dtype=np.float64)
-    matrix_functions.fill_V12_f(V12, lwl_known, lwl_predict, amp_f, l_f)
+    matrix_functions.fill_V12_f(V12, lwl_f, lwl_predict, amp_f, l_f)
 
     V22 = np.empty((N, N), dtype=np.float64)
     # V22 is the covariance between the prediction wavelengths
@@ -47,7 +49,7 @@ def predict_f(lwl_known, fl_known, sigma_known, lwl_predict, amp_f, l_f, mu_GP=1
     # Find V11^{-1}
     factor, flag = cho_factor(V11)
 
-    mu = mu_GP + np.dot(V12.T, cho_solve((factor, flag), (fl_known - mu_GP)))
+    mu = mu_GP + np.dot(V12.T, cho_solve((factor, flag), (fl_f - mu_f)))
 
     Sigma = V22 - np.dot(V12.T, cho_solve((factor, flag), V12))
 
@@ -79,9 +81,27 @@ def predict_python(wl_known, fl_known, sigma_known, wl_predict, amp_f, l_f, mu_G
 
 
 def predict_f_g(lwl_f, lwl_g, fl_fg, sigma_fg, lwl_f_predict, lwl_g_predict, mu_f, amp_f, l_f, mu_g, amp_g, l_g, get_Sigma=True):
+    '''Return the posterior predictive GP mean and covariance for `f` and `g`.
+
+    Args:
+        lwl_f (1D np.array): log(wavelength) vector for dataset corresponding to rest-frame of primary
+        lwl_g (1D np.array): log(wavelength) vector for dataset corresponding to rest-frame of secondary
+        fl_fg (1D np.array): flux vector for dataset
+        sigma_fg (1D np.array): sigma vector for dataset
+        lwl_f_predict (1D np.array): log(wavelength) vector to use primary GP to predict at. Does not need to be the same length as lwl_f.
+        lwl_g_predict (1D np.array): log(wavelength) vector to use secondary GP to predict at. Does not need to be the same length as lwl_g.
+        mu_f (float): mean of primary GP
+        amp_f (float): amplitude of primary GP
+        l_f (float): length scale of primary GP
+        mu_g (float): mean of secondary GP
+        amp_g (float): amplitude of secondary GP
+        l_g (float): length scale of secondary GP
+        get_Sigma (boolean): if ``True``, return the joint covariance matrix for the predictions.
+
+    Returns:
+        tuple: (mu, Sigma) tuple of mean vector and covariance matrix. mu is length ``n_f_predict + n_g_predict``
     '''
-    Given that f + g is the flux that we're modeling, jointly predict the components.
-    '''
+
     # Assert that wl_f and wl_g are the same length
     assert len(lwl_f) == len(lwl_g), "Input wavelengths must be the same length."
     n_pix = len(lwl_f)
@@ -95,7 +115,6 @@ def predict_f_g(lwl_f, lwl_g, fl_fg, sigma_fg, lwl_f_predict, lwl_g_predict, mu_
 
     # Cat these into a single vector
     mu_cat = np.hstack((mu_f, mu_g))
-
 
     # Create the matrices for the input data
     # print("allocating V11_f, V11_g", n_pix, n_pix)
@@ -149,7 +168,25 @@ def predict_f_g(lwl_f, lwl_g, fl_fg, sigma_fg, lwl_f_predict, lwl_g_predict, mu_
 
 
 def predict_f_g_sum(lwl_f, lwl_g, fl_fg, sigma_fg, lwl_f_predict, lwl_g_predict, mu_fg, amp_f, l_f, amp_g, l_g):
+    '''Return the posterior predictive GP mean and covariance for the sum of `f + g`.
 
+    Args:
+        lwl_f (1D np.array): log(wavelength) vector for dataset corresponding to rest-frame of primary
+        lwl_g (1D np.array): log(wavelength) vector for dataset corresponding to rest-frame of secondary
+        fl_fg (1D np.array): flux vector for dataset
+        sigma_fg (1D np.array): sigma vector for dataset
+        lwl_f_predict (1D np.array): log(wavelength) vector to use primary GP to predict at. Does not need to be the same length as lwl_f.
+        lwl_g_predict (1D np.array): log(wavelength) vector to use secondary GP to predict at. Does not need to be the same length as lwl_g.
+        mu_fg (float): mean of sum of GPs
+        amp_f (float): amplitude of primary GP
+        l_f (float): length scale of primary GP
+        mu_g (float): mean of secondary GP
+        amp_g (float): amplitude of secondary GP
+        l_g (float): length scale of secondary GP
+
+    Returns:
+        tuple: (mu, Sigma) tuple of mean vector and covariance matrix. mu is length ``n_f_predict + n_g_predict``
+    '''
     # Assert that wl_f and wl_g are the same length
     assert len(lwl_f) == len(lwl_g), "Input wavelengths must be the same length."
 
@@ -188,8 +225,30 @@ def predict_f_g_sum(lwl_f, lwl_g, fl_fg, sigma_fg, lwl_f_predict, lwl_g_predict,
 
 
 def predict_f_g_h(lwl_f, lwl_g, lwl_h, fl_fgh, sigma_fgh, lwl_f_predict, lwl_g_predict, lwl_h_predict, mu_f, mu_g, mu_h, amp_f, l_f, amp_g, l_g, amp_h, l_h):
-    '''
-    Given that f + g + h is the flux that we're modeling, jointly predict the components.
+    '''Return the posterior predictive GP mean and covariance for `f`, `g`, and `h`.
+
+    Args:
+        lwl_f (1D np.array): log(wavelength) vector for dataset corresponding to rest-frame of primary
+        lwl_g (1D np.array): log(wavelength) vector for dataset corresponding to rest-frame of secondary
+        lwl_h (1D np.array): log(wavelength) vector for dataset corresponding to rest-frame of tertiary
+        fl_fg (1D np.array): flux vector for dataset
+        sigma_fgh (1D np.array): sigma vector for dataset
+        lwl_f_predict (1D np.array): log(wavelength) vector to use primary GP to predict at. Does not need to be the same length as lwl_f.
+        lwl_g_predict (1D np.array): log(wavelength) vector to use secondary GP to predict at. Does not need to be the same length as lwl_g.
+        lwl_h_predict (1D np.array): log(wavelength) vector to use tertiary GP to predict at. Does not need to be the same length as lwl_h.
+        mu_f (float): mean of primary GP
+        mu_g (float): mean of secondary GP
+        mu_h (float): mean of tertiary GP
+        amp_f (float): amplitude of primary GP
+        l_f (float): length scale of primary GP
+        amp_g (float): amplitude of secondary GP
+        l_g (float): length scale of secondary GP
+        amp_h (float): amplitude of tertiary GP
+        l_h (float): length scale of tertiary GP
+        get_Sigma (boolean): if ``True``, return the joint covariance matrix for the predictions.
+
+    Returns:
+        tuple: (mu, Sigma) tuple of mean vector and covariance matrix. mu is length ``n_f_predict + n_g_predict + n_g_predict``
     '''
     # Assert that wl_f and wl_g are the same length
     assert len(lwl_f) == len(lwl_g), "Input wavelengths must be the same length."
@@ -251,9 +310,30 @@ def predict_f_g_h(lwl_f, lwl_g, lwl_h, fl_fgh, sigma_fgh, lwl_f_predict, lwl_g_p
     return mu, Sigma
 
 def predict_f_g_h_sum(lwl_f, lwl_g, lwl_h, fl_fgh, sigma_fgh, lwl_f_predict, lwl_g_predict, lwl_h_predict, mu_fgh, amp_f, l_f, amp_g, l_g, amp_h, l_h):
+    '''Return the posterior predictive GP mean and covariance for the sum of  `f + g + h`.
+
+    Args:
+        lwl_f (1D np.array): log(wavelength) vector for dataset corresponding to rest-frame of primary
+        lwl_g (1D np.array): log(wavelength) vector for dataset corresponding to rest-frame of secondary
+        lwl_h (1D np.array): log(wavelength) vector for dataset corresponding to rest-frame of tertiary
+        fl_fgh (1D np.array): flux vector for dataset
+        sigma_fgh (1D np.array): sigma vector for dataset
+        lwl_f_predict (1D np.array): log(wavelength) vector to use primary GP to predict at. Does not need to be the same length as lwl_f.
+        lwl_g_predict (1D np.array): log(wavelength) vector to use secondary GP to predict at. Does not need to be the same length as lwl_g.
+        lwl_h_predict (1D np.array): log(wavelength) vector to use tertiary GP to predict at. Does not need to be the same length as lwl_h.
+        mu_fgh (float): mean of GP
+        amp_f (float): amplitude of primary GP
+        l_f (float): length scale of primary GP
+        amp_g (float): amplitude of secondary GP
+        l_g (float): length scale of secondary GP
+        amp_h (float): amplitude of tertiary GP
+        l_h (float): length scale of tertiary GP
+        get_Sigma (boolean): if ``True``, return the joint covariance matrix for the predictions.
+
+    Returns:
+        tuple: (mu, Sigma) tuple of mean vector and covariance matrix.
     '''
-    Given that f + g + h is the flux that we're modeling, predict the joint sum.
-    '''
+
     # Assert that wl_f and wl_g are the same length
     assert len(lwl_f) == len(lwl_g), "Input wavelengths must be the same length."
 
@@ -296,18 +376,18 @@ def predict_f_g_h_sum(lwl_f, lwl_g, lwl_h, fl_fgh, sigma_fgh, lwl_f_predict, lwl
 
     return mu, Sigma
 
-def lnlike_f(V11, wl_f, fl, sigma, amp_f, l_f, mu_GP=1.):
+def lnlike_f(V11, lwl_f, fl, sigma, amp_f, l_f, mu_GP=1.):
     """Calculate the log-likelihood for a single-lined spectrum.
 
-    This function takes a pre-allocated array and fills out the covariance matrices and evaluates the likelihood function for a single-lined spectrum, assuming a squared-exponential kernel (does not ``celerite``).
+    This function takes a pre-allocated array and fills out the covariance matrices and evaluates the likelihood function for a single-lined spectrum, assuming a squared-exponential kernel (this routine does not ``celerite``).
 
     Args:
-        V11 (numpy 2D array): Description of arg1
-        wl_f (numpy 1D array): Description of arg2
-        fl (numpy 1D array): ae
+        V11 (numpy 2D array): square covariance matrix to be filled
+        lwl_f (numpy 1D array): ln(wavelength) vector
+        fl (numpy 1D array): flux vector
         amp_f (float) : amplitude of GP
         l_f (float) : length scale of GP
-        mu_GP (float) : mean of GP
+        mu_GP (float) : mean of GP (default 1)
 
     Returns:
         float: The log-likelihood value
@@ -318,11 +398,11 @@ def lnlike_f(V11, wl_f, fl, sigma, amp_f, l_f, mu_GP=1.):
         return -np.inf
 
     # Fill the matrix using fast cython routine.
-    matrix_functions.fill_V11_f(V11, wl_f, amp_f, l_f)
+    matrix_functions.fill_V11_f(V11, lwl_f, amp_f, l_f)
     V11[np.diag_indices_from(V11)] += sigma**2
 
     try:
-        factor, flag = cho_factor(V11)
+        factor, flag = cho_factor(V11, overwrite_a=True, lower=False)
     except np.linalg.linalg.LinAlgError:
         return -np.inf
 
@@ -330,22 +410,37 @@ def lnlike_f(V11, wl_f, fl, sigma, amp_f, l_f, mu_GP=1.):
 
     return -0.5 * (np.dot((fl - mu_GP).T, cho_solve((factor, flag), (fl - mu_GP))) + logdet)
 
-def lnlike_f_g(V11, wl_f, wl_g, fl, sigma, amp_f, l_f, amp_g, l_g, mu_GP=1.):
-    '''
-    V11 is a matrix to be allocated.
-    wl_known, fl_known, and sigma_known are flattened 1D arrays.
+def lnlike_f_g(V11, lwl_f, lwl_g, fl, sigma, amp_f, l_f, amp_g, l_g, mu_GP=1.):
+    """Calculate the log-likelihood for a double-lined spectrum.
 
-    '''
+    This function takes a pre-allocated array and fills out the covariance matrices and evaluates the likelihood function for a double-lined spectrum, assuming a squared-exponential kernel. Assumes that all input wavelengths and flux quantities are flattened 1D arrays.
+
+    Args:
+        V11 (numpy 2D array): square covariance matrix to be filled
+        lwl_f (numpy 1D array): ln(wavelength) vector corresponding to primary rest-frame
+        lwl_g (numpy 1D array): ln(wavelength) vector corresponding to secondary rest-frame
+        fl (numpy 1D array): flux vector
+        amp_f (float) : amplitude of primary GP
+        l_f (float) : length scale of primary GP
+        amp_g (float) : amplitude of secondary GP
+        l_g (float) : length scale of secondary GP
+        mu_GP (float) : mean of GP (default 1)
+
+    Returns:
+        float: The log-likelihood value
+
+    """
+
     if  amp_f < 0.0 or l_f < 0.0 or amp_g < 0.0 or l_g < 0.0:
         return -np.inf
 
     # Fill the matrix using fast cython routine.
-    matrix_functions.fill_V11_f_g(V11, wl_f, wl_g, amp_f, l_f, amp_g, l_g)
+    matrix_functions.fill_V11_f_g(V11, lwl_f, lwl_g, amp_f, l_f, amp_g, l_g)
     V11[np.diag_indices_from(V11)] += sigma**2
 
     try:
         # factor, flag = cho_factor(V11)
-        factor, flag = cho_factor(V11, overwrite_a=True, lower=False, check_finite=False)
+        factor, flag = cho_factor(V11, overwrite_a=True, lower=False)
     except np.linalg.linalg.LinAlgError:
         return -np.inf
 
@@ -353,17 +448,33 @@ def lnlike_f_g(V11, wl_f, wl_g, fl, sigma, amp_f, l_f, amp_g, l_g, mu_GP=1.):
 
     return -0.5 * (np.dot((fl - mu_GP).T, cho_solve((factor, flag), (fl - mu_GP))) + logdet)
 
-def lnlike_f_g_h(V11, wl_f, wl_g, wl_h, fl, sigma, amp_f, l_f, amp_g, l_g, amp_h, l_h, mu_GP=1.):
-    '''
-    V11 is a matrix to be allocated.
-    wl_known, fl_known, and sigma_known are flattened 1D arrays.
+def lnlike_f_g_h(V11, lwl_f, lwl_g, lwl_h, fl, sigma, amp_f, l_f, amp_g, l_g, amp_h, l_h, mu_GP=1.):
+    """Calculate the log-likelihood for a triple-lined spectrum.
 
-    '''
+    This function takes a pre-allocated array and fills out the covariance matrices and evaluates the likelihood function for a triple-lined spectrum, assuming a squared-exponential kernel. Assumes that all input wavelengths and flux quantities are flattened 1D arrays.
+
+    Args:
+        V11 (numpy 2D array): square covariance matrix to be filled
+        lwl_f (numpy 1D array): ln(wavelength) vector corresponding to primary rest-frame
+        lwl_g (numpy 1D array): ln(wavelength) vector corresponding to secondary rest-frame
+        lwl_h (numpy 1D array): ln(wavelength) vector corresponding to tertiary rest-frame
+        fl (numpy 1D array): flux vector
+        amp_f (float) : amplitude of primary GP
+        l_f (float) : length scale of primary GP
+        amp_g (float) : amplitude of secondary GP
+        l_g (float) : length scale of secondary GP
+        mu_GP (float) : mean of GP (default 1)
+
+    Returns:
+        float: The log-likelihood value
+
+    """
+
     if  amp_f < 0.0 or l_f < 0.0 or amp_g < 0.0 or l_g < 0.0 or amp_h < 0.0 or l_h < 0.0:
         return -np.inf
 
     # Fill the matrix using fast cython routine.
-    matrix_functions.fill_V11_f_g_h(V11, wl_f, wl_g, wl_h, amp_f, l_f, amp_g, l_g, amp_h, l_h)
+    matrix_functions.fill_V11_f_g_h(V11, lwl_f, lwl_g, lwl_h, amp_f, l_f, amp_g, l_g, amp_h, l_h)
     V11[np.diag_indices_from(V11)] += sigma**2
 
     try:
