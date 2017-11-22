@@ -20,7 +20,7 @@ entry_points = {'console_scripts': [
     'psoap-process-masks = psoap.scripts.masks:process_main',
     'psoap-reconstruct = psoap.scripts.reconstruct:main',
     'psoap-sample = psoap.scripts.sample:main',
-    'psoap-sample-parallel = psoap.scripts.sample_parallel:main',
+    'psoap-sample-serial = psoap.scripts.sample_serial:main',
     'psoap-plot-samples = psoap.scripts.plot_samples:main',
     'psoap-hdf5-exploder = psoap.scripts.hdf5_exploder:main'
 ]}

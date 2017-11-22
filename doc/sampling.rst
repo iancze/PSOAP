@@ -1,13 +1,12 @@
 .. _sampling:
 
-Reconstructing Spectra and Sampling the Parameters
-==================================================
+Sampling and Reconstructing Spectra
+===================================
 
+The main function of `PSOAP` as a package is to sample the distribution of intrinsic stellar spectra and the orbital parameters, and then use these parameters to understand the orbit and stellar spectra. Since the sampling can take a long time (in fact, much longer than your astronomy career if you've chosen a poor starting point and/or poor proposal steps), and you may already have a decent guess at a stellar orbit (especially if you already have 5 or more spectra and RVs from the same telescope), it might be worth trying out the reconstruction step before committing the computational resources to do a full exploration of the posterior.
 
 Reconstructing Spectra
 ----------------------
-
-The main function of `PSOAP` as a package is to sample the distribution of intrinsic stellar spectra and the orbital parameters, and then use these parameters to understand the orbit and stellar spectra. Since the sampling can take a long time (in fact, much longer than your astronomy career if you've chosen a poor starting point and/or poor proposal steps), and you may already have a decent guess at a stellar orbit (especially if you already have 5 or more spectra and RVs from the same telescope), it might be worth trying out the reconstruction step before committing the computational resources to do a full exploration of the posterior.
 
 First, edit the ``parameters`` section of your ``config.yaml`` to reflect your best guess orbital parameters. In general, the amplitude hyperparameters of the GP will be reflective of the amplitude of the spectral line variations (typically in the range 5% - 60% of the continuum level, depending on the type of star). The length scale (in km/s) is roughly proportional to the broadening kernel of the spectra. For regular stars acquired with high resolution spectrographs, ``l`` will probably be in the range of 2 - 40 km/s.
 
@@ -17,6 +16,11 @@ The reconstruction of spectra boils down to Equation 27 of `Czekala et al. 2017 
 Sampling the posterior
 ----------------------
 
+The main purpose of the sampling routines are to propose and evaluate the posterior probability of the orbital and GP hyperparameters, provided by the routines in :ref:`covariance`. Because we have chunked the spectrum for faster likelihood evalution, the main routine you will likely use is ``psoap-sample``, whose command-line arguments are provided in :ref:`scripts`. This routine runs fastest when you are able to provide a number of CPUs equal to the number of chunks in your spectrum. As long as you have more CPUs available, you should be able to continue adding more chunks of spectrum to the inference process with no additional time per each posterior evaluation.
+
+For testing and tuorial purposes, a serial version of this script is provided in ``psoap-sample-serial``.
+
+The main routine
 
 Options to use SB2 and SB1. Show an example using the fast ``celerite`` GPs for single lined systems, including options to determine radial velocity on a per-epoch basis. Also strong warnings about contamination from secondary light.
 
