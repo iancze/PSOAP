@@ -117,6 +117,33 @@ Initialization
       --plot      Make plots of the applied masks.
 
 
+Reconstruction
+--------------
+
+.. code:: python
+
+    !psoap-reconstruct --help
+
+
+.. parsed-literal::
+
+    Traceback (most recent call last):
+      File "/home/ian/.build/anaconda/bin/psoap-reconstruct", line 11, in <module>
+        load_entry_point('psoap==0.0.1', 'console_scripts', 'psoap-reconstruct')()
+      File "/home/ian/.build/anaconda/lib/python3.6/site-packages/pkg_resources/__init__.py", line 570, in load_entry_point
+        return get_distribution(dist).load_entry_point(group, name)
+      File "/home/ian/.build/anaconda/lib/python3.6/site-packages/pkg_resources/__init__.py", line 2751, in load_entry_point
+        return ep.load()
+      File "/home/ian/.build/anaconda/lib/python3.6/site-packages/pkg_resources/__init__.py", line 2405, in load
+        return self.resolve()
+      File "/home/ian/.build/anaconda/lib/python3.6/site-packages/pkg_resources/__init__.py", line 2411, in resolve
+        module = __import__(self.module_name, fromlist=['__name__'], level=0)
+      File "/home/ian/.build/anaconda/lib/python3.6/site-packages/psoap-0.0.1-py3.6-linux-x86_64.egg/psoap/scripts/reconstruct.py", line 176
+        # TODO
+             ^
+    SyntaxError: unexpected EOF while parsing
+
+
 Sampling
 --------
 

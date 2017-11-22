@@ -14,6 +14,8 @@ Installation
 * ``astropy``
 * ``h5py``
 * ``matplotlib``
+* ``emcee``
+* ``corner``
 * ``celerite`` (optional)
 
 All of these packages can be installed via an `Anaconda Python <http://continuum.io/downloads>`_ installation or your normal means of managing your Python packages. Once you have installed them, clone the `PSOAP` package from the `github repository <https://github.com/iancze/PSOAP>`_ ::

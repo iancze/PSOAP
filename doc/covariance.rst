@@ -1,3 +1,5 @@
+.. _covariance:
+
 Covariance Routines
 ===================
 
@@ -59,5 +61,3 @@ The ``psoap.covariance.py`` module contains all of the routines for filling and 
 .. automodule:: psoap.covariance
     :members:
     :exclude-members: cycle_calibration, cycle_calibration_chunk, predict_python, lnlike_f_g_george, optimize_calibration_static, optimize_epoch_velocity_f, optimize_calibration_ST1, optimize_GP_f, optimize_calibration
-
-This is the covariance module.

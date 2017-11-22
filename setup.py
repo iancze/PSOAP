@@ -18,6 +18,7 @@ entry_points = {'console_scripts': [
     'psoap-process-chunks = psoap.scripts.chunks:process_main',
     'psoap-generate-masks = psoap.scripts.masks:generate_main',
     'psoap-process-masks = psoap.scripts.masks:process_main',
+    'psoap-reconstruct = psoap.scripts.reconstruct:main',
     'psoap-sample = psoap.scripts.sample:main',
     'psoap-sample-parallel = psoap.scripts.sample_parallel:main',
     'psoap-plot-samples = psoap.scripts.plot_samples:main'
@@ -95,7 +96,7 @@ setup(
     # your project is installed. For an analysis of "install_requires" vs pip's
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    install_requires=['numpy', 'scipy', 'cython', 'h5py', 'emcee', 'astropy', 'matplotlib'],
+    install_requires=['numpy', 'scipy', 'cython', 'h5py', 'emcee', 'astropy', 'matplotlib', 'corner'],
 
     entry_points=entry_points,
     # List additional groups of dependencies here (e.g. development

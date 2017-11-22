@@ -3,5 +3,6 @@ scipy
 cython
 h5py
 astropy
-emcee
 matplotlib
+emcee
+corner

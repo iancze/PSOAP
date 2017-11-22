@@ -27,8 +27,8 @@ Contents:
    orbit
    data
    covariance
-   sampling
    reconstruction
+   sampling
    scripts
    tutorial
    changelog

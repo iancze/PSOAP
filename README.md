@@ -12,8 +12,7 @@ PSOAP is a package for simultaneously inferring stellar (and/or exoplanet) orbit
 * Generation of high-fidelity stellar templates (for use with traditional RV cross-correlation measurements, variability searches)
 * Inferring orbits and spectra of double-lined spectroscopic binaries (see gif below)
 
-Documentation and installation instructi
-ons are available at [http://psoap.readthedocs.io](http://psoap.readthedocs.io).
+Documentation and installation instructions are available at [http://psoap.readthedocs.io](http://psoap.readthedocs.io).
 
 ![disentangling loop](output.gif "disentangling loop")
 
