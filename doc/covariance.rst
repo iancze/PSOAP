@@ -3,7 +3,9 @@
 Covariance Routines
 ===================
 
-In the original paper, the kernel was specified using the velocity distance between two wavelengths (:math:`\lambda_i`, :math:`\lambda_j`). In subsequent versions, we choose to simply by using the absolute magnitude of the distance between the *natural log* of the wavelengths, which is functionally equivalent to the former definition, but makes the computation easier.
+The ``psoap.covariance.py`` module contains all of the routines for filling and solving covariance matrices, which are used in evaluation of the Gaussian process likelihood and the posterior mean and covariance. Some of the guts of the matrix filling routines are written in cython in the ``matrix_functions.pyx`` module, which are wrapped by the methods below.
+
+In the original paper, the kernel was specified using the velocity distance between two wavelengths (:math:`\lambda_i`, :math:`\lambda_j`) computed via the Doppler shift. In subsequent versions, we choose to simply by using the absolute magnitude of the distance between the *natural log* of the wavelengths (times :math:`c`), which is functionally equivalent to the former definition, but makes the computation easier.
 
 The non-relativistic Doppler shift is
 
@@ -41,7 +43,7 @@ Then we have as a distance metric
 
     r_{ij} = c\,|\zeta_i - \zeta_j|
 
-where :math:`r_{ij}` has units of km/s. Of course, when we are fitting for two spectral components, *f* and *g*, then there will be two sets of input wavelength vectors and thus two distances
+where :math:`r_{ij}` has units of km/s. When we are fitting for two spectral components, *f* and *g*, then there will be two sets of input wavelength vectors and thus two distances
 
 .. math::
 
@@ -56,7 +58,6 @@ With two stars, to evaluate the kernel for a specific element in the matrix actu
 
 For more information on the construction of the covariance matrix, see Section 2 of `Czekala et al., 2017ApJ...840...49C <http://adsabs.harvard.edu/abs/2017ApJ...840...49C>`_.
 
-The ``psoap.covariance.py`` module contains all of the routines for filling and solving covariance matrices, which are used in evaluation of the Gaussian process likelihood and the posterior mean and covariance. Some of the guts of the matrix filling routines are written in cython in the ``matrix_functions.pyx`` module, which are wrapped by the following methods.
 
 .. automodule:: psoap.covariance
     :members:

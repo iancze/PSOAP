@@ -44,7 +44,7 @@ Chunking the dataset
 
 Due to the steep :math:`{\cal O}(N^3)` scaling of the matrix multiplications for Gaussian processes and the relative sparseness of the covariance kernels (only nearby pixels are significantly correlated), it is fastest to do the likelihood calculations on chunks of the spectrum, rather than the full spectral range in one go. This also enables the likelihood evaluations to be parallelized on multi-core machines or compute clusters.
 
-A major component of the fitting process revolves around the ``chunks.dat`` file, which is an ascii file with the following space-separated form ::
+The fitting process revolves around the ``chunks.dat`` file, which is an ascii file with the following space-separated form ::
 
   order wl0 wl1
   22 5160.0 5165.2
@@ -67,10 +67,9 @@ Occasionally, your spectra may suffer from local non-Gaussian defects such as co
     wl0 wl1 t0 t1
     3000.0 9999.9 2456966.0 2457015.5
     3000.0 9999.9 2457297.5 2457298.5
-    6099.2 6100.5 2456045.5 2456045.7
-    6100.8 6101.8 2455957.6 2455958.0
-    6104.5 6105.5 2455856.9 2455857.1
-    6105.5 6106.3 2455826.9 2455827.1
+    5160.8 5161.8 2455957.6 2455958.0
+    5164.5 5165.5 2455856.9 2455857.1
+    5185.5 5186.3 2455826.9 2455827.1
     6104.6 6106.3 2456559.7 2456560.1
 
 Each row lists a starting wavelength and ending wavelength (in AA), along with a starting and ending date (in JD). For example, you can mask out entire epochs of spectra using something like the first two rows, or just mask out a single ~1 AA chunk in a specific range of epochs using the remaining rows. You can use the ``psoap-generate-masks`` script to autogenerate this file, though you may need to go back and tweak some regions by hand later. Once you are satisified with the choices, you can use the ``psoap-process-masks`` script to mask out these regions in all of the spectrum chunks.

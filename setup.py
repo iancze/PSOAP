@@ -21,7 +21,8 @@ entry_points = {'console_scripts': [
     'psoap-reconstruct = psoap.scripts.reconstruct:main',
     'psoap-sample = psoap.scripts.sample:main',
     'psoap-sample-parallel = psoap.scripts.sample_parallel:main',
-    'psoap-plot-samples = psoap.scripts.plot_samples:main'
+    'psoap-plot-samples = psoap.scripts.plot_samples:main',
+    'psoap-hdf5-exploder = psoap.scripts.hdf5_exploder:main'
 ]}
 
 
@@ -44,7 +45,7 @@ setup(
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='0.0.1',
+    version='0.2.0',
 
     description='Gaussian Processes for Radial Velocity Analysis',
     long_description=long_description,

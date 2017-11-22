@@ -118,8 +118,8 @@ def get_labels(model, fix_params):
 
 def gelman_rubin(samplelist):
     r'''
-    Given a list of flatchains from separate runs (that already have burn in cut
-    and have been trimmed, if desired), compute the Gelman-Rubin statistic for each parameter (more information in
+    Given a list of flatchains from separate runs that already have burn in cut
+    to the same size, compute the Gelman-Rubin statistic for each parameter (more information in
     Bayesian Data Analysis 3, pg 284 Gelman et al.). If you want to compute this for fewer
     parameters, then slice the list before feeding it in.
 
