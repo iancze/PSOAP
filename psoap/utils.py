@@ -5,6 +5,7 @@ The ``utils`` module contains values and functions for interacting with the regi
 import numpy as np
 
 # A dictionary of parameter lists for conversion.
+# For example, if the config.yaml file specifies model as "SB1", then it must list all of these parameters under "SB1".
 registered_params = {"SB1": ["K", "e", "omega", "P", "T0", "gamma", "amp_f", "l_f"],
 "SB2": ["q", "K", "e", "omega", "P", "T0", "gamma", "amp_f", "l_f", "amp_g", "l_g"],
 "ST1": ["K_in", "e_in", "omega_in", "P_in", "T0_in", "K_out", "e_out", "omega_out", "P_out", "T0_out", "gamma", "amp_f", "l_f"],
@@ -22,8 +23,60 @@ registered_labels = {"SB1": [r"$K$", r"$e$", r"$\omega$", r"$P$", r"$T_0$", r"$\
 "SB2": [r"$q$", r"$K$", r"$e$", r"$\omega$", r"$P$", r"$T_0$", r"$\gamma$", r"$a_f$", r"$l_f$", r"$a_g$", r"$l_g$"],
 "ST3": [r"$q_\mathrm{in}$", r"$K_\mathrm{in}$", r"$e_\mathrm{in}$", r"$\omega_\mathrm{in}$", r"$P_\mathrm{in}$", r"$T_{0,\mathrm{in}}$", r"$q_\mathrm{out}$", r"$K_\mathrm{out}$", r"$e_\mathrm{out}$", r"$\omega_\mathrm{out}$", r"$P_\mathrm{out}$", r"$T_{0,\mathrm{out}}$", r"$\gamma$", r"$a_f$", r"$l_f$", r"$a_g$", r"$l_g$", r"$a_h$", r"$l_h$"]}
 
-# For example, if the config.yaml file specifies model as "SB1", then it must list all of these parameters under "SB1".
 
+# Specify the priors
+def prior_SB1(p_orb, p_gp):
+    (K, e, omega, P, T0, gamma) = p_orb
+    (amp_f, l_f) = p_gp
+
+    if K < 0.0 or e < 0.0 or e > 1.0 or P < 0.0 or omega < -90 or omega > 450 or amp_f < 0.0 or l_f < 0.0:
+        return -np.inf
+
+    else:
+        return 0.0
+
+def prior_SB2(p_orb, p_gp):
+    (q, K, e, omega, P, T0, gamma) = p_orb
+    (amp_f, l_f, amp_g, l_g) = p_gp
+
+    if q < 0.0 or K < 0.0 or e < 0.0 or e > 1.0 or P < 0.0 or omega < -90 or omega > 450 or amp_f < 0.0 or l_f < 0.0 or amp_g < 0.0 or l_g < 0.0:
+        return -np.inf
+    else:
+        return 0.0
+
+def prior_ST1(p_orb, p_gp):
+    (K_in, e_in, omega_in, P_in, T0_in, K_out, e_out, omega_out, P_out, T0_out, gamma) = p_orb
+    (amp_f, l_f) = p_gp
+
+    if K_in < 0.0 or e_in < 0.0 or e_in > 1.0 or P_in < 0.0 or omega_in < -90 or omega_in > 450 or K_out < 0.0 or e_out < 0.0 or e_out > 1.0 or P_out < 0.0 or omega_out < -90 or omega_out > 450 or amp_f < 0.0 or l_f < 0.0:
+        return -np.inf
+
+    else:
+        return 0.0
+
+def prior_ST2(p_orb, p_gp):
+
+    (q_in, K_in, e_in, omega_in, P_in, T0_in, K_out, e_out, omega_out, P_out, T0_out, gamma) = p_orb
+    (amp_f, l_f, amp_g, l_g) = p_gp
+
+    if q_in < 0.0 or K_in < 0.0 or e_in < 0.0 or e_in > 1.0 or P_in < 0.0 or omega_in < -90 or omega_in > 450 or K_out < 0.0 or e_out < 0.0 or e_out > 1.0 or P_out < 0.0 or omega_out < -90 or omega_out > 450 or amp_f < 0.0 or l_f < 0.0 or amp_g < 0.0 or l_g < 0.0:
+        return -np.inf
+
+    else:
+        return 0.0
+
+
+def prior_ST3(p_orb, p_gp):
+    (q_in, K_in, e_in, omega_in, P_in, T0_in, q_out, K_out, e_out, omega_out, P_out, T0_out, gamma) = p_orb
+    (amp_f, l_f, amp_g, l_g, amp_h, l_h) = p_gp
+
+    if q_in < 0.0 or K_in < 0.0 or e_in < 0.0 or e_in > 1.0 or P_in < 0.0 or omega_in < -90 or omega_in > 450 or q_out < 0.0 or K_out < 0.0 or e_out < 0.0 or e_out > 1.0 or P_out < 0.0 or omega_out < -90 or omega_out > 450 or amp_f < 0.0 or l_f < 0.0 or amp_g < 0.0 or l_g < 0.0 or amp_h < 0.0 or l_h < 0.0:
+        return -np.inf
+
+    else:
+        return 0.0
+
+priors = {"SB1":prior_SB1, "SB2":prior_SB2, "ST1":prior_ST1, "ST2":prior_ST2, "ST3":prior_ST3}
 # It must also specify fix_params, which will always include gamma.
 
 # Then, within the sampling routines, we will create a partial function that takes in model type, list of fixed parameters, and dictionary of default  parameter values and upon invocation will convert a vector of only a subset of values into a full vector.
@@ -32,13 +85,13 @@ def convert_vector(p, model, fix_params, **kwargs):
     '''Unroll a vector of parameter values into a parameter type, using knowledge about which model we are fitting, the parameters we are fixing, and the default values of those parameters.
 
     Args:
-        p (np.float) : 1D input array of only a subset of parameter values.
+        p (np.array) : 1D input array of only a subset of parameter values.
         model (str): ``"SB1"``, ``"SB2"``, etc..
         fix_params (list of str): names of parameters that will be fixed
         **kwargs: input for ``{param_name: default_value}`` pairs
 
     Returns:
-        (np.float, np.float) : a 2-tuple of the  full vectors for the orbital parameters, and the GP parameters, augmented with the previously missing values.
+        (np.array, np.array) : a 2-tuple of the  full vectors for the orbital parameters, and the GP parameters, augmented with the previously missing values.
 
     '''
 

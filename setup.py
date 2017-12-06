@@ -14,6 +14,7 @@ import numpy as np
 # set the command line scripts
 entry_points = {'console_scripts': [
     'psoap-initialize = psoap.scripts.initialize:main',
+    'psoap-hdf5-exploder = psoap.scripts.hdf5_exploder:main',
     'psoap-generate-chunks = psoap.scripts.chunks:generate_main',
     'psoap-process-chunks = psoap.scripts.chunks:process_main',
     'psoap-generate-masks = psoap.scripts.masks:generate_main',
@@ -22,7 +23,7 @@ entry_points = {'console_scripts': [
     'psoap-sample = psoap.scripts.sample:main',
     'psoap-sample-serial = psoap.scripts.sample_serial:main',
     'psoap-plot-samples = psoap.scripts.plot_samples:main',
-    'psoap-hdf5-exploder = psoap.scripts.hdf5_exploder:main'
+    'psoap-gelman-rubin = psoap.scripts.gelman_rubin:main'
 ]}
 
 
@@ -66,7 +67,7 @@ setup(
         #   3 - Alpha
         #   4 - Beta
         #   5 - Production/Stable
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
 
         # Indicate who your project is intended for
         'Intended Audience :: Developers',
@@ -77,9 +78,9 @@ setup(
 
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
-        'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6'
     ],
 
     # What does your project relate to?
@@ -120,7 +121,8 @@ setup(
                 'data/Gl417BC/*',
                 'data/Gl570BC/*',
                 'data/HD10009/*',
-                'data/Sigma248/*'],
+                'data/Sigma248/*',
+                'data/prior.py'],
     },
 
     # Although 'package_data' is the preferred approach, in some case you may

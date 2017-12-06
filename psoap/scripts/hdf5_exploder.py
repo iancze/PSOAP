@@ -2,17 +2,17 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from ..data import Spectrum, redshift
-import ..constants as C
+from .. import constants as C
 
 import yaml
 import argparse
 
 def main():
     parser = argparse.ArgumentParser(description="Make summary plots for a full HDF5 dataset.")
-    parser.add_argument("--orders", help="Which orders to plot. By default, all orders are plotted. Can add more than one order in a spaced list, e.g., --orders 22 23 24 but not --orders=22,23,24", default="all", nargs="*")
+    parser.add_argument("--orders", help="Which orders to plot (indexed from 0). By default, all orders are plotted. You can add more than one order in a spaced list, e.g., --orders 22 23 24 but not --orders=22,23,24", default="all", nargs="*")
     parser.add_argument("--SNR", action="store_true", help="Plot spectra in order of highest SNR first, instead of by date. Default is by date.")
     parser.add_argument("--topo", action="store_true", help="Plot spectra in topocentric frame instead of barycentric frame. Default is barycentric frame.")
-    parser.add_argument("--spacing", type=float, default=1, help="Multiply the default vertical spacing between epochs by this value")
+    parser.add_argument("--spacing", type=float, default=1, help="Multiply the default vertical spacing between epoch spectra by this value, in order to increase or decrease the vertical spread.")
 
     args = parser.parse_args()
 
@@ -67,9 +67,9 @@ def main():
         BCVs = spectrum.BCV
         wls = redshift(wls, -BCVs)
 
-
     # Set up some plot constants
-    dy_per_epoch = 0.5 * args.spacing # in
+    # Each spectrum will take up this much physical space in the plot.
+    dy_per_epoch = 0.5 # in
 
     for order in orders:
         # Create a specific director for the order, if it doesn't exist.
@@ -83,28 +83,27 @@ def main():
         # calculate max and min wl for this order
         wl_min = np.min(wls[:,order])
         wl_max = np.max(wls[:,order])
-        fl_min = np.min(fls[:,order])
-        fl_max = np.max(fls[:,order])
         wl_range = (wl_max - wl_min)
-        fl_range = (fl_max - fl_min)
-
 
         x0 = wl_min - 0.09 * wl_range
         x0_annotate = wl_min - 0.045 * wl_range
         x1 = wl_max + 0.09 * wl_range
         x1_annotate = wl_max + 0.045 * wl_range
 
-        y0 = fl_min - 0.09 * fl_range
-        y1 = fl_max + 0.09 * fl_range
-
+        # This figure is always 10 inches in width, the height scales depending
+        # on how many epochs of data you have.
         fig, ax = plt.subplots(figsize=(10.0, n_epochs * dy_per_epoch))
 
-        ax.set_ylim(1.0, 2.0 + 0.4 * n_epochs)
-        ax.annotate("JD - 2,400,000", (x0_annotate, 1.4 + 0.4 * n_epochs), color='k', ha="left", va="center", size=8)
-        ax.annotate("SNR", (x1_annotate, 1.4 + 0.4 * n_epochs), color='k', ha="center", va="center", size=8)
+        # Offset in continuum units, where continuum = 1
+        offset = 1.0 * args.spacing
+
+        # The 0.4 is an arbitrary choice as default spacing between epochs (relative to continuum level).
+        ax.set_ylim(1.0, 2.0 + offset * n_epochs)
+        ax.annotate("JD - 2,400,000", (x0_annotate, 1.4 + offset * n_epochs), color='k', ha="left", va="center", size=8)
+        ax.annotate("SNR", (x1_annotate, 1.4 + offset * n_epochs), color='k', ha="center", va="center", size=8)
+
 
         for i in range(n_epochs):
-            offset = 0.4 * args.spacing
             pedastal = offset * n_epochs
             p = ax.plot(wls[i,order,:], fls[i,order,:] + (pedastal - offset * i))
             color = p[0].get_color() # the color of the line we just plotted
@@ -128,6 +127,13 @@ def main():
             fig, ax = plt.subplots(figsize=(10,8))
             ax.plot(wls[i,order,:], fls[i,order,:], color="k")
             ax.set_xlim(x0, x1)
+
+            fl_min = np.min(fls[i,order])
+            fl_max = np.max(fls[i,order])
+            fl_range = (fl_max - fl_min)
+            y0 = fl_min - 0.09 * fl_range
+            y1 = fl_max + 0.09 * fl_range
+
             ax.set_ylim(y0, y1)
             ax.annotate("JD - 2,400,000\n{:.1f}".format(dates[i] - 2400000), (x0_annotate, 1.0), color='k', ha="center", va="center", size=8)
             ax.annotate("SNR\n{:.0f}".format(SNR), (x1_annotate, 1.0), color='k', ha="center", va="center", size=8)
@@ -143,15 +149,6 @@ def main():
                 fig.savefig(plots_dir + "{:.1f}.png".format(dates[i]))
 
             plt.close('all')
-
-
-    # plot all orders all epochs separately
-    # plot all epochs together, offset
-    # all epochs offset
-    #     - in order of SNR
-    #     - in order of date
-    #     - in BC frame
-    #     - in topo frame.
 
 
 if __name__=="__main__":

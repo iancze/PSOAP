@@ -181,7 +181,7 @@ def main():
     parser.add_argument("--reconstruct", choices=["mean", "Sigma"], help="If 'mean', compute the posterior predictive mean and variance of the individual spectral components. If 'Sigma', additionally compute the full cross-covariance matrix.")
     parser.add_argument("--draws", type=int, default=0, help="In addition to plotting the mean GP, plot several draws of the GP to show the scatter in predictions of the covariance matrices on disk. Must already have executed the reconstruction phase to include at least one covariance matrix.")
     parser.add_argument("--plot", action="store_true", help="Plot the chunks using all of the reconstructed data and (optionally) draws already on disk.")
-    parser.add_argument("--chunk", help=Limit the reconstruction or plots to this specific chunk (or list of chunks in a spaced list, e.g., --chunk 1 2 3 but not --chunk=1,2,3).", default="all", nargs="*")
+    parser.add_argument("--chunk", help="Limit the reconstruction or plots to this specific chunk (or list of chunks in a spaced list, e.g., --chunk 1 2 3 but not --chunk=1,2,3).", default="all", nargs="*")
     args = parser.parse_args()
 
     # Load the config file, determine which model we're using.

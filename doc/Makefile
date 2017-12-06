@@ -62,6 +62,7 @@ scripts.rst: .static/notebooks/scripts.ipynb
 .PHONY: clean
 clean:
 	rm -rf $(BUILDDIR)/*
+	rm -rf .static/notebooks/LP661-13
 
 .PHONY: html
 html: $(TUTORIALS)

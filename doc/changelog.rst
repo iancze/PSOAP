@@ -31,7 +31,7 @@ standardized different model selections
 Now models can be specified as combinations of the number of gravitationally significant bodies, and the number of spectroscopically significant bodies. See `models.md` for more information. This has an impact for the way `orbit.py` is used.
 
 
-Calibration optimization
+calibration optimization
 ------------------------
 
 For now, only implemented for the `ST3` model.

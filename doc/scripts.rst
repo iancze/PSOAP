@@ -30,7 +30,7 @@ Initialization
 
 .. parsed-literal::
 
-    usage: psoap-initialize [-h] [--check] [--model {SB1,SB2,ST3}]
+    usage: psoap-initialize [-h] [--check] [--model {SB1,SB2,ST1,ST2,ST3}]
     
     Initialize a new directory with the necessary configuration scripts to run
     PSOAP.
@@ -39,8 +39,36 @@ Initialization
       -h, --help            show this help message and exit
       --check               Check whether the package was installed and the
                             scripts were linked properly.
-      --model {SB1,SB2,ST3}
-                            Which type of model to use, SB1, SB2, ST1, or SB3.
+      --model {SB1,SB2,ST1,ST2,ST3}
+                            Which type of model to use.
+
+
+.. code:: python
+
+    !psoap-hdf5-exploder --help
+
+
+.. parsed-literal::
+
+    usage: psoap-hdf5-exploder [-h] [--orders [ORDERS [ORDERS ...]]] [--SNR]
+                               [--topo] [--spacing SPACING]
+    
+    Make summary plots for a full HDF5 dataset.
+    
+    optional arguments:
+      -h, --help            show this help message and exit
+      --orders [ORDERS [ORDERS ...]]
+                            Which orders to plot (indexed from 0). By default, all
+                            orders are plotted. You can add more than one order in
+                            a spaced list, e.g., --orders 22 23 24 but not
+                            --orders=22,23,24
+      --SNR                 Plot spectra in order of highest SNR first, instead of
+                            by date. Default is by date.
+      --topo                Plot spectra in topocentric frame instead of
+                            barycentric frame. Default is barycentric frame.
+      --spacing SPACING     Multiply the default vertical spacing between epoch
+                            spectra by this value, in order to increase or
+                            decrease the vertical spread.
 
 
 .. code:: python
@@ -127,21 +155,36 @@ Reconstruction
 
 .. parsed-literal::
 
-    Traceback (most recent call last):
-      File "/home/ian/.build/anaconda/bin/psoap-reconstruct", line 11, in <module>
-        load_entry_point('psoap==0.0.1', 'console_scripts', 'psoap-reconstruct')()
-      File "/home/ian/.build/anaconda/lib/python3.6/site-packages/pkg_resources/__init__.py", line 570, in load_entry_point
-        return get_distribution(dist).load_entry_point(group, name)
-      File "/home/ian/.build/anaconda/lib/python3.6/site-packages/pkg_resources/__init__.py", line 2751, in load_entry_point
-        return ep.load()
-      File "/home/ian/.build/anaconda/lib/python3.6/site-packages/pkg_resources/__init__.py", line 2405, in load
-        return self.resolve()
-      File "/home/ian/.build/anaconda/lib/python3.6/site-packages/pkg_resources/__init__.py", line 2411, in resolve
-        module = __import__(self.module_name, fromlist=['__name__'], level=0)
-      File "/home/ian/.build/anaconda/lib/python3.6/site-packages/psoap-0.0.1-py3.6-linux-x86_64.egg/psoap/scripts/reconstruct.py", line 176
-        # TODO
-             ^
-    SyntaxError: unexpected EOF while parsing
+    usage: psoap-reconstruct [-h] [--reconstruct {mean,Sigma}] [--draws DRAWS]
+                             [--plot] [--chunk [CHUNK [CHUNK ...]]]
+    
+    Perform various tasks related to calculating the posterior predictive means
+    and covariances of the Gaussian process spectral models, conditional on the
+    orbital parameters and Gaussian process hyperparameters. A default call with
+    no flags will not perform any action, so please choose the appropriate flags.
+    There are three main functions that can be performed by this script (1):
+    calculating the posterior predictive mean and covariance, and saving these to
+    disk (2): taking samples from this distribution, and (3): plotting any of the
+    data products created in the previous steps.
+    
+    optional arguments:
+      -h, --help            show this help message and exit
+      --reconstruct {mean,Sigma}
+                            If 'mean', compute the posterior predictive mean and
+                            variance of the individual spectral components. If
+                            'Sigma', additionally compute the full cross-
+                            covariance matrix.
+      --draws DRAWS         In addition to plotting the mean GP, plot several
+                            draws of the GP to show the scatter in predictions of
+                            the covariance matrices on disk. Must already have
+                            executed the reconstruction phase to include at least
+                            one covariance matrix.
+      --plot                Plot the chunks using all of the reconstructed data
+                            and (optionally) draws already on disk.
+      --chunk [CHUNK [CHUNK ...]]
+                            Limit the reconstruction or plots to this specific
+                            chunk (or list of chunks in a spaced list, e.g.,
+                            --chunk 1 2 3 but not --chunk=1,2,3).
 
 
 Sampling
@@ -156,30 +199,7 @@ The following scripts are used in sampling the posterior distribution.
 
 .. parsed-literal::
 
-    Traceback (most recent call last):
-      File "/home/ian/.build/anaconda/bin/psoap-sample", line 11, in <module>
-        load_entry_point('psoap==0.0.1', 'console_scripts', 'psoap-sample')()
-      File "/home/ian/.build/anaconda/lib/python3.6/site-packages/pkg_resources/__init__.py", line 570, in load_entry_point
-        return get_distribution(dist).load_entry_point(group, name)
-      File "/home/ian/.build/anaconda/lib/python3.6/site-packages/pkg_resources/__init__.py", line 2751, in load_entry_point
-        return ep.load()
-      File "/home/ian/.build/anaconda/lib/python3.6/site-packages/pkg_resources/__init__.py", line 2405, in load
-        return self.resolve()
-      File "/home/ian/.build/anaconda/lib/python3.6/site-packages/pkg_resources/__init__.py", line 2411, in resolve
-        module = __import__(self.module_name, fromlist=['__name__'], level=0)
-      File "/home/ian/.build/anaconda/lib/python3.6/site-packages/psoap-0.0.1-py3.6-linux-x86_64.egg/psoap/scripts/sample.py", line 5, in <module>
-        from psoap.data import Chunk, lredshift, replicate_wls
-    ImportError: cannot import name 'replicate_wls'
-
-
-.. code:: python
-
-    !psoap-sample-parallel --help
-
-
-.. parsed-literal::
-
-    usage: psoap-sample-parallel [-h] [--debug] run_index
+    usage: psoap-sample [-h] [--debug] run_index
     
     Sample the distribution across multiple chunks.
     
@@ -190,4 +210,71 @@ The following scripts are used in sampling the posterior distribution.
     optional arguments:
       -h, --help  show this help message and exit
       --debug     Print out debug commands to log.log
+
+
+.. code:: python
+
+    !psoap-sample-serial --help
+
+
+.. parsed-literal::
+
+    You need to copy a config.yaml file to this directory, and then edit the values to your particular case.
+    Traceback (most recent call last):
+      File "/home/ian/.build/anaconda/bin/psoap-sample-serial", line 11, in <module>
+        load_entry_point('psoap==0.2.0', 'console_scripts', 'psoap-sample-serial')()
+      File "/home/ian/.build/anaconda/lib/python3.6/site-packages/pkg_resources/__init__.py", line 570, in load_entry_point
+        return get_distribution(dist).load_entry_point(group, name)
+      File "/home/ian/.build/anaconda/lib/python3.6/site-packages/pkg_resources/__init__.py", line 2751, in load_entry_point
+        return ep.load()
+      File "/home/ian/.build/anaconda/lib/python3.6/site-packages/pkg_resources/__init__.py", line 2405, in load
+        return self.resolve()
+      File "/home/ian/.build/anaconda/lib/python3.6/site-packages/pkg_resources/__init__.py", line 2411, in resolve
+        module = __import__(self.module_name, fromlist=['__name__'], level=0)
+      File "/home/ian/.build/anaconda/lib/python3.6/site-packages/psoap-0.2.0-py3.6-linux-x86_64.egg/psoap/scripts/sample_serial.py", line 33, in <module>
+        f = open("config.yaml")
+    FileNotFoundError: [Errno 2] No such file or directory: 'config.yaml'
+
+
+.. code:: python
+
+    !psoap-plot-samples --help
+
+
+.. parsed-literal::
+
+    usage: psoap-plot-samples [-h] [--burn BURN] [--config CONFIG] [--tri]
+                              [--interactive] [--cov]
+    
+    Measure statistics across multiple chains.
+    
+    optional arguments:
+      -h, --help       show this help message and exit
+      --burn BURN      How many samples to discard from the beginning of the chain
+                       for burn in.
+      --config CONFIG  name of the config file used for the run.
+      --tri            Plot the triangle too.
+      --interactive    Pop up the walker window so that you can zoom around.
+      --cov            Estimate the optimal covariance to tune MH jumps.
+
+
+.. code:: python
+
+    !psoap-gelman-rubin --help
+
+
+.. parsed-literal::
+
+    usage: psoap-gelman-rubin [-h] [--burn BURN] glob
+    
+    Measure statistics across multiple chains.
+    
+    positional arguments:
+      glob         Do something on this glob. Must be given as a quoted expression
+                   to avoid shell expansion.
+    
+    optional arguments:
+      -h, --help   show this help message and exit
+      --burn BURN  How many samples to discard from the beginning of the chain for
+                   burn in.
 

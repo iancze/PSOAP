@@ -21,12 +21,11 @@ import os
 import numpy as np
 from astropy.io import ascii
 
-# from psoap.samplers import StateSampler
-import psoap.constants as C
-from psoap.data import Chunk, lredshift, replicate_wls
-from psoap import utils
-from psoap import orbit
-from psoap import covariance
+from .. import constants as C
+from ..data import Chunk, lredshift, replicate_lwls
+from .. import utils
+from .. import orbit
+from .. import covariance
 
 from scipy.linalg import cho_factor, cho_solve
 from numpy.linalg import slogdet
@@ -328,34 +327,6 @@ worker = Worker(debug=True)
 pconns, cconns, ps = initialize(worker)
 
 
-def prior_SB1(p):
-    (K, e, omega, P, T0, gamma), (amp_f, l_f) = convert_vector_p(p)
-
-    if K < 0.0 or e < 0.0 or e > 1.0 or P < 0.0 or omega < -90 or omega > 450 or amp_f < 0.0 or l_f < 0.0:
-        return -np.inf
-
-    else:
-        return 0.0
-
-def prior_SB2(p):
-    (q, K, e, omega, P, T0, gamma), (amp_f, l_f, amp_g, l_g) = convert_vector_p(p)
-
-    if q < 0.0 or K < 0.0 or e < 0.0 or e > 1.0 or P < 0.0 or omega < -90 or omega > 450 or amp_f < 0.0 or l_f < 0.0 or amp_g < 0.0 or l_g < 0.0:
-        return -np.inf
-    else:
-        return 0.0
-
-
-def prior_ST3(p):
-    (q_in, K_in, e_in, omega_in, P_in, T0_in, q_out, K_out, e_out, omega_out, P_out, T0_out, gamma), (amp_f, l_f, amp_g, l_g, amp_h, l_h) = convert_vector_p(p)
-
-    if q_in < 0.0 or K_in < 0.0 or e_in < 0.0 or e_in > 1.0 or P_in < 0.0 or omega_in < -90 or omega_in > 450 or q_out < 0.0 or K_out < 0.0 or e_out < 0.0 or e_out > 1.0 or P_out < 0.0 or omega_out < -90 or omega_out > 450 or amp_f < 0.0 or l_f < 0.0 or amp_g < 0.0 or l_g < 0.0 or amp_h < 0.0 or l_h < 0.0:
-        return -np.inf
-
-    else:
-        return 0.0
-
-
 # Optionally load a user-defined prior.
 # Check if a file named "prior.py" exists in the local folder
 # If so, import it
@@ -365,12 +336,15 @@ try:
 except ImportError:
     print("Using default prior.")
     # Set the default priors.
-    priors = {"SB1":prior_SB1, "SB2":prior_SB2, "ST3":prior_ST3}
-    prior = priors[model]
+    prior = utils.priors[model]
 
 def lnprob(p):
 
-    lnprior = prior(p)
+    # The priors defined in utils.py expect two arguments, p_orb and p_gp, which are each vectors
+    # of the full parameter array defined in utils.py
+    # this code takes the MCMC proposal, fills it to a 2-tuple of (p_orb, p_gp), and then unpacks it
+    # to the call of the prior.
+    lnprior = prior(*convert_vector_p(p))
     if lnprior == -np.inf:
         return -np.inf
 

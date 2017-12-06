@@ -135,7 +135,9 @@ class Chunk:
             self.mask = np.ones_like(self.wl, dtype="bool")
         else:
             self.mask = mask
-        self.n_epochs, self.n_pix = self.wl.shape
+
+        self.n_epochs = self.wl.shape[0] #: number of spectroscopic epochs
+        self.n_pix = self.wl.shape[1] #: number of pixels in each epoch
 
     def apply_mask(self):
         '''

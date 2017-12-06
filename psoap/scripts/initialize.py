@@ -1,5 +1,6 @@
 import sys
 import pkg_resources
+import psoap
 
 def main():
 
@@ -7,13 +8,13 @@ def main():
 
     parser = argparse.ArgumentParser(description="Initialize a new directory with the necessary configuration scripts to run PSOAP.")
     parser.add_argument("--check", action="store_true", help="Check whether the package was installed and the scripts were linked properly.")
-    parser.add_argument("--model", choices=["SB1", "SB2", "ST3"], help="Which type of model to use, SB1, SB2, ST1, or SB3.")
+    parser.add_argument("--model", choices=["SB1", "SB2", "ST1", "ST2", "ST3"], help="Which type of model to use.")
 
     args = parser.parse_args()
 
     if args.check:
 
-        print("PSOAP successfully installed and linked.")
+        print("PSOAP version {} successfully installed and linked.".format(psoap.__version__))
         print("Using Python Version", sys.version)
         sys.exit()
 
